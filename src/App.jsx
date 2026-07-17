@@ -7,6 +7,7 @@ import Humor from "./pages/Humor";
 import Calendario from "./pages/Calendario"; 
 import Menu from "./pages/Menu";
 import Perfil from "./pages/Perfil"; 
+import RecuperarSenha from './pages/ResetPassword'; 
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/calendario" element={<Calendario />} />
         <Route path="/menu" element={<Menu />} />
         <Route path="/perfil" element={<Perfil />} />
+        <Route path="/RecuperarSenha" element={<RecuperarSenha />} />
       </Routes>
     </Router>
   );
