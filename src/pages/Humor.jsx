@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../firebaseConfig";
@@ -8,10 +8,9 @@ import { toast } from "sonner";
 
 export default function Humor() {
   const navigate = useNavigate();
-  const [selectedMood, setSelectedMood] = useState(null);
-  const [selectedClima, setSelectedClima] = useState(null); 
-  const [note, setNote] = useState("");
-  const [selectedFactors, setSelectedFactors] = useState([]);
+  const location = useLocation();
+
+  const registroParaEditar = location.state?.registroParaEditar;
 
   const moods = [
     { emoji: "😡", label: "Raiva", color: "text-rose-400", question: "O que te tirou do sério hoje?", nivel: 20 },
@@ -28,6 +27,27 @@ export default function Humor() {
   ];
 
   const fatores = ["Família", "Trabalho", "Saúde", "Relacionamento", "Estudos", "Finanças", "Lazer", "Sono"];
+
+  // Estados
+  const [selectedMood, setSelectedMood] = useState(null);
+  const [selectedClima, setSelectedClima] = useState(null); 
+  const [note, setNote] = useState("");
+  const [selectedFactors, setSelectedFactors] = useState([]);
+
+  useEffect(() => {
+    if (registroParaEditar) {
+      const indexMood = moods.findIndex(m => m.label === registroParaEditar.humor || m.emoji === registroParaEditar.emoji);
+      if (indexMood !== -1) setSelectedMood(indexMood);
+
+      if (registroParaEditar.clima?.condicao) {
+        const indexClima = climas.findIndex(c => c.label.toLowerCase() === registroParaEditar.clima.condicao.toLowerCase());
+        if (indexClima !== -1) setSelectedClima(indexClima);
+      }
+
+      if (registroParaEditar.nota) setNote(registroParaEditar.nota);
+      if (registroParaEditar.fatores) setSelectedFactors(registroParaEditar.fatores);
+    }
+  }, [registroParaEditar]);
 
   const toggleFactor = (factor) => {
     setSelectedFactors((prev) =>
@@ -48,40 +68,48 @@ export default function Humor() {
         return;
       }
 
-      // Descobre automaticamente se é Dia de Semana ou Fim de Semana
       const hoje = new Date();
       const numeroDia = hoje.getDay(); 
       const isFimDeSemana = numeroDia === 0 || numeroDia === 6;
       const tipoDeDia = isFimDeSemana ? "Fim de Semana" : "Dia de Semana";
 
-      // MANTENDO A SUA ESTRUTURA ORIGINAL EM FORMATO DE MAPA/OBJETO
       const climaMap = {
         condicao: climas[selectedClima].label, 
         temperatura: 22, 
       };
 
-      const humorRef = doc(collection(db, "usuarios", user.uid, "registrosHumor"));
-      
-      await setDoc(humorRef, {
-        idHumor: humorRef.id,
+      const dadosRegistro = {
         humor: moods[selectedMood].label,
         emoji: moods[selectedMood].emoji,
         nivel: moods[selectedMood].nivel,
         nota: note,
         fatores: selectedFactors,
-        data: hoje,
-        clima: climaMap, // Mantém a estrutura de objeto original
-        tipoDia: tipoDeDia, // Adiciona a nova variável para a IA
-      });
+        clima: climaMap,
+        tipoDia: tipoDeDia,
+      };
 
-      const userRef = doc(db, "usuarios", user.uid);
-      await updateDoc(userRef, { xp: increment(10) });
+      if (registroParaEditar?.docId) {
+        const docRef = doc(db, "usuarios", user.uid, "registrosHumor", registroParaEditar.docId);
+        await updateDoc(docRef, dadosRegistro);
+        toast.success("Registro atualizado com sucesso! ✨");
+      } else {
+        const humorRef = doc(collection(db, "usuarios", user.uid, "registrosHumor"));
+        await setDoc(humorRef, {
+          ...dadosRegistro,
+          idHumor: humorRef.id,
+          data: hoje,
+        });
 
-      toast.success("Check-in registado! +10 XP ✨");
-      navigate("/menu"); 
+        const userRef = doc(db, "usuarios", user.uid);
+        await updateDoc(userRef, { xp: increment(10) });
+        toast.success("Check-in registrado! +10 XP ✨");
+      }
+
+      navigate("/Calendario"); 
       
     } catch (error) {
-      toast.error("Erro ao guardar o seu registo.");
+      console.error("Erro ao salvar:", error);
+      toast.error("Erro ao guardar o seu registro.");
     }
   };
 
@@ -96,8 +124,12 @@ export default function Humor() {
         className="w-full max-w-xl bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-peach-300/40 border border-white"
       >
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-extrabold text-peach-500 tracking-tight">Check-in do Sentir</h2>
-          <p className="text-gray-500 mt-2 text-lg">Como está agora?</p>
+          <h2 className="text-3xl font-extrabold text-peach-500 tracking-tight">
+            {registroParaEditar ? "Editar Check-in" : "Check-in do Sentir"}
+          </h2>
+          <p className="text-gray-500 mt-2 text-lg">
+            {registroParaEditar ? "Ajuste os detalhes do seu registro" : "Como está agora?"}
+          </p>
         </div>
 
         {/* Seleção de Humor */}
@@ -181,7 +213,7 @@ export default function Humor() {
           onClick={handleSave}
           className="w-full mt-8 bg-peach-500 hover:bg-peach-400 text-white font-bold py-4 rounded-2xl shadow-lg shadow-peach-300 transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale active:scale-95"
         >
-          Concluir Check-in
+          {registroParaEditar ? "Salvar Alterações" : "Concluir Check-in"}
           <ArrowRight className="size-5" />
         </button>
       </motion.div>
