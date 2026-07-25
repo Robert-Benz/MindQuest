@@ -1,27 +1,29 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useForm, Controller } from "react-hook-form";
+import { useForm /*, Controller */ } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { 
-  User, Mail, Heart, Film, Music, Sparkles, 
-  ArrowLeft, Save, CheckCircle2, Camera 
+  User, Mail, /* Heart, Film, Music, */ Sparkles, 
+  ArrowLeft, Save, CheckCircle2, Camera, Loader2 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../firebaseConfig";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, query, limit, getDocs } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Adicionado Storage!
+import { onAuthStateChanged, updateProfile } from "firebase/auth";
+import { doc, getDoc, setDoc /*, collection, query, limit, getDocs */ } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
+import BottomNav from "../components/BottomNav";
 
 const schema = z.object({
   nome: z.string().min(3, "Como podemos te chamar?"),
-  objetivoPrincipal: z.string().min(1, "Escolha seu objetivo"),
-  generoMusical: z.string().min(1, "Qual som te acalma?"),
-  generoFilme: z.string().min(1, "Qual estilo de filme você prefere?"),
+  // objetivoPrincipal: z.string().optional(),
+  // generoMusical: z.string().optional(),
+  // generoFilme: z.string().optional(),
 });
 
-// Componente de Dropdown Arredondado
+/*
+// Componente de Dropdown Arredondado (Comentado por enquanto)
 function CustomSelect({ value, onChange, placeholder, options, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectedOption = options.find((opt) => opt.value === value);
@@ -64,27 +66,73 @@ function CustomSelect({ value, onChange, placeholder, options, icon: Icon }) {
     </div>
   );
 }
+*/
 
 export default function Perfil() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [salvando, setSalvando] = useState(false);
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [userXP, setUserXP] = useState(0);
   
-  // Novos estados para a Foto de Perfil
   const [fotoURL, setFotoURL] = useState(null);
   const [arquivoFoto, setArquivoFoto] = useState(null);
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, /* control, */ reset, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       nome: "",
-      objetivoPrincipal: "",
-      generoMusical: "",
-      generoFilme: ""
+      // objetivoPrincipal: "",
+      // generoMusical: "",
+      // generoFilme: ""
     }
   });
+
+// Função para redimensionar e comprimir a imagem antes do upload
+const comprimirImagem = (file, maxWidth = 400, quality = 0.8) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // Mantém a proporção quadrada
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxWidth) {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Converte para Blob leve (JPEG)
+        canvas.toBlob(
+          (blob) => {
+            resolve(blob);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+    };
+  });
+};
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -96,28 +144,31 @@ export default function Perfil() {
       setUserEmail(user.email || "");
 
       try {
-        let nomeAtual = "";
-        let objetivoAtual = "";
-        let musicaAtual = "";
-        let filmeAtual = "";
+        let nomeAtual = user.displayName || "";
+        // let objetivoAtual = "";
+        // let musicaAtual = "";
+        // let filmeAtual = "";
 
-        // Busca dados
         const userDocRef = doc(db, "usuarios", user.uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
           const dados = userDocSnap.data();
-          nomeAtual = dados.nome || "";
+          if (dados.nome) nomeAtual = dados.nome;
           setUserXP(dados.xp || 0);
           
-          // Carrega a foto de perfil se ela existir no banco
-          if (dados.fotoURL) setFotoURL(dados.fotoURL);
+          if (dados.fotoURL) {
+            setFotoURL(dados.fotoURL);
+          } else if (user.photoURL) {
+            setFotoURL(user.photoURL);
+          }
           
-          if (dados.objetivoPrincipal) objetivoAtual = dados.objetivoPrincipal;
-          if (dados.generoMusical) musicaAtual = dados.generoMusical;
-          if (dados.generoFilme) filmeAtual = dados.generoFilme;
+          // if (dados.objetivoPrincipal) objetivoAtual = dados.objetivoPrincipal;
+          // if (dados.generoMusical) musicaAtual = dados.generoMusical;
+          // if (dados.generoFilme) filmeAtual = dados.generoFilme;
         }
 
+        /*
         const subRef = collection(db, "usuarios", user.uid, "respostasFormulario");
         const subSnap = await getDocs(query(subRef, limit(1)));
 
@@ -127,12 +178,13 @@ export default function Perfil() {
           if (respostas["2"]) musicaAtual = respostas["2"];
           if (respostas["3"]) filmeAtual = respostas["3"];
         }
+        */
 
         reset({
           nome: nomeAtual,
-          objetivoPrincipal: objetivoAtual,
-          generoMusical: musicaAtual,
-          generoFilme: filmeAtual
+          // objetivoPrincipal: objetivoAtual,
+          // generoMusical: musicaAtual,
+          // generoFilme: filmeAtual
         });
 
       } catch (error) {
@@ -145,13 +197,11 @@ export default function Perfil() {
     return () => unsubscribe();
   }, [reset, navigate]);
 
-  // Função que lida com a seleção da imagem no computador/celular
   const handleFotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setArquivoFoto(file);
       
-      // Cria um preview da imagem instantaneamente
       const reader = new FileReader();
       reader.onloadend = () => {
         setFotoURL(reader.result);
@@ -160,54 +210,72 @@ export default function Perfil() {
     }
   };
 
+  // --- LÓGICA DE SALVAMENTO NO BANCO ---
   const onSubmit = async (data) => {
+    setSalvando(true);
     try {
       const user = auth.currentUser;
       if (!user) return;
 
-      let urlFinal = fotoURL; // Mantém a antiga se não upou nada de novo
+      let urlFinal = fotoURL;
 
-      // Se o usuário selecionou um arquivo novo, fazemos o Upload pro Firebase Storage
+      // 1. Upload do arquivo de foto
       if (arquivoFoto) {
         const storage = getStorage();
         const imageRef = ref(storage, `perfil/${user.uid}`);
         
-        // Sobe a imagem
-        await uploadBytes(imageRef, arquivoFoto);
+        const fotoComprimida = await comprimirImagem(arquivoFoto, 400, 0.8);
         
-        // Pega a URL pública da imagem que acabou de subir
+        await uploadBytes(imageRef, fotoComprimida, { contentType: "image/jpeg" });
         urlFinal = await getDownloadURL(imageRef);
       }
 
+      // 2. Atualiza perfil no Firebase Auth
+      await updateProfile(user, {
+        displayName: data.nome,
+        photoURL: urlFinal
+      });
+
+      // 3. Salva os dados no Firestore (Apenas nome e foto)
       const userDocRef = doc(db, "usuarios", user.uid);
       await setDoc(userDocRef, {
         nome: data.nome,
         email: userEmail,
-        fotoURL: urlFinal, // Salva a URL da foto!
-        objetivoPrincipal: data.objetivoPrincipal,
-        generoMusical: data.generoMusical,
-        generoFilme: data.generoFilme
+        fotoURL: urlFinal,
       }, { merge: true });
 
-      const subRef = collection(db, "usuarios", user.uid, "respostasFormulario");
-      const subSnap = await getDocs(query(subRef, limit(1)));
-      
-      let targetDocRef = subSnap.empty 
-        ? doc(db, "usuarios", user.uid, "respostasFormulario", "questionarioInicial")
-        : doc(db, "usuarios", user.uid, "respostasFormulario", subSnap.docs[0].id);
+      /*
+      // 4. Atualização da subcoleção de recomendações (Comentado por enquanto)
+      if (data.objetivoPrincipal || data.generoMusical || data.generoFilme) {
+        const subRef = collection(db, "usuarios", user.uid, "respostasFormulario");
+        const subSnap = await getDocs(query(subRef, limit(1)));
+        
+        let targetDocRef = subSnap.empty 
+          ? doc(db, "usuarios", user.uid, "respostasFormulario", "questionarioInicial")
+          : doc(db, "usuarios", user.uid, "respostasFormulario", subSnap.docs[0].id);
 
-      await setDoc(targetDocRef, {
-        respostas: {
-          "0": data.objetivoPrincipal,
-          "2": data.generoMusical,
-          "3": data.generoFilme
-        }
-      }, { merge: true });
+        await setDoc(targetDocRef, {
+          respostas: {
+            "0": data.objetivoPrincipal || "",
+            "2": data.generoMusical || "",
+            "3": data.generoFilme || ""
+          }
+        }, { merge: true });
+      }
+      */
 
+      // 5. Mensagens de sucesso
+      toast.success("Perfil atualizado com sucesso! ✨");
       setShowSuccessBadge(true);
       setTimeout(() => setShowSuccessBadge(false), 3000);
+
+      setArquivoFoto(null);
+
     } catch (error) {
+      console.error("Erro ao salvar:", error);
       toast.error("Erro ao salvar alterações: " + error.message);
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -224,22 +292,8 @@ export default function Perfil() {
   const proximoNivelXP = nivelAtual * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-peach-50 via-white to-orange-50 p-4 md:p-10 text-slate-800 antialiased font-sans pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-peach-50 via-white to-orange-50 p-4 md:p-10 text-slate-800 antialiased font-sans pb-28">
       
-      <AnimatePresence>
-        {showSuccessBadge && (
-          <motion.div 
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-600 px-5 py-3 rounded-full shadow-lg text-sm font-semibold"
-          >
-            <CheckCircle2 className="size-5 text-emerald-500" />
-            Perfil atualizado com sucesso!
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="max-w-xl mx-auto space-y-6">
         
         <button 
@@ -257,7 +311,6 @@ export default function Perfil() {
         >
           <div className="flex flex-col items-center text-center">
             
-            {/* Input de arquivo invisível (acionado pelo clique no avatar) */}
             <input 
               type="file" 
               id="fotoInput" 
@@ -266,6 +319,7 @@ export default function Perfil() {
               onChange={handleFotoChange} 
             />
 
+            {/* SELETOR DE FOTO */}
             <div 
               className="relative mb-3 group cursor-pointer"
               onClick={() => document.getElementById('fotoInput').click()}
@@ -278,7 +332,6 @@ export default function Perfil() {
                 )}
               </div>
               
-              {/* Máscara escura com a câmera que aparece ao passar o mouse */}
               <div className="absolute inset-0 bg-black/40 rounded-[2rem] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
                 <Camera className="size-8 text-white" />
               </div>
@@ -310,6 +363,7 @@ export default function Perfil() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             
+            {/* EDIÇÃO DO NOME */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-gray-400 ml-1 uppercase tracking-widest">Seu Nome</label>
               <div className="relative">
@@ -324,6 +378,7 @@ export default function Perfil() {
               {errors.nome && <p className="text-red-400 text-xs mt-1 ml-2">{errors.nome.message}</p>}
             </div>
 
+            {/* EMAIL (APENAS LEITURA) */}
             <div className="space-y-1.5 opacity-70">
               <label className="text-[10px] font-bold text-gray-400 ml-1 uppercase tracking-widest">Email</label>
               <div className="relative">
@@ -337,7 +392,8 @@ export default function Perfil() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-100/80">
+            {/* ------------------- SEÇÃO DE RECOMENDAÇÕES COMENTADA ------------------- */}
+            {/* <div className="pt-4 border-t border-slate-100/80">
               <label className="text-[10px] font-bold ml-1 uppercase tracking-widest text-peach-500">Suas Recomendações</label>
             </div>
 
@@ -405,17 +461,30 @@ export default function Perfil() {
                 />
               </div>
             </div>
+            */}
 
             <button 
               type="submit" 
-              className="w-full bg-peach-500 hover:bg-peach-400/95 text-white p-4 rounded-2xl font-bold shadow-lg shadow-peach-500/10 transition-all active:scale-[0.99] mt-6 flex items-center justify-center gap-2"
+              disabled={salvando}
+              className="w-full bg-peach-500 hover:bg-peach-400/95 text-white p-4 rounded-2xl font-bold shadow-lg shadow-peach-500/10 transition-all active:scale-[0.99] mt-6 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Save className="size-5" />
-              Salvar Alterações
+              {salvando ? (
+                <>
+                  <Loader2 className="size-5 animate-spin" />
+                  <span>Salvando...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="size-5" />
+                  <span>Salvar Alterações</span>
+                </>
+              )}
             </button>
           </form>
         </motion.div>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

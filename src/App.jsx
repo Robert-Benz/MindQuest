@@ -8,6 +8,10 @@ import Calendario from "./pages/Calendario";
 import Menu from "./pages/Menu";
 import Perfil from "./pages/Perfil"; 
 import RecuperarSenha from './pages/ResetPassword'; 
+import Senha from "./pages/Senha"
+import CadastroPsicologo from "./pages/Cadastro-Psicologo";
+import MenuPsicologo from "./pages/Menu-Psicologo";
+import Formulario from "./pages/Formulario"
 
 function App() {
   return (
@@ -21,6 +25,12 @@ function App() {
         <Route path="/humor" element={<Humor />} />
         <Route path="/calendario" element={<Calendario />} />
         <Route path="/menu" element={<Menu />} />
+        <Route path="/senha" element={<Senha />}/>
+        <Route path="/cadastropsicologo" element={<CadastroPsicologo />}/>
+        <Route path="/menupsicologo" element={<MenuPsicologo />}/>
+        <Route path="/formulario" element={<Formulario />}/>
+        
+
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/RecuperarSenha" element={<RecuperarSenha />} />
       </Routes>

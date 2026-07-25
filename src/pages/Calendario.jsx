@@ -1,24 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Calendar as CalendarIcon,
-  ArrowLeft,
-  X,
-  Trash2,
-  Edit3,
-  CloudRain,
-  Sun,
-  Cloud,
-  Tag,
-  Lock
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft, X, Trash2, Edit3, Sun, Tag, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebaseConfig";
 import { collection, query, getDocs, deleteDoc, doc, orderBy } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { toast } from "sonner";
+import BottomNav from "../components/BottomNav";
 
 export default function Calendario() {
   const navigate = useNavigate();
@@ -26,11 +14,9 @@ export default function Calendario() {
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [registroSelecionado, setRegistroSelecionado] = useState(null);
-
-  // [BACKEND] Processo de buscar os registros da tabela de humor em ordem cronológica
+  
   const fetchRegistros = async (user) => {
     try {
-      // Adicionado orderBy("data", "asc") para garantir a cronologia
       const q = query(
         collection(db, "usuarios", user.uid, "registrosHumor"),
         orderBy("data", "asc") 
@@ -48,7 +34,6 @@ export default function Calendario() {
           dataRegistro = new Date(data.data);
         }
 
-        // [BACKEND] Implementação lógica do calendário (puxar apenas os dias do mês atual)
         if (
           dataRegistro.getMonth() === currentDate.getMonth() &&
           dataRegistro.getFullYear() === currentDate.getFullYear()
@@ -106,7 +91,6 @@ export default function Calendario() {
   const diasArray = Array.from({ length: diasNoMes }, (_, i) => i + 1);
   const diasFelizes = registros.filter(r => r.nivel >= 80).length;
 
-  // [BACKEND] Criação da trava de segurança para a não edição
   const verificarSeEhHoje = (dataRegistro) => {
     const hoje = new Date();
     return (
@@ -117,7 +101,7 @@ export default function Calendario() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-peach-100 via-white to-peach-300 p-6 antialiased text-gray-800 pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-peach-100 via-white to-peach-300 p-6 antialiased text-gray-800 pb-28">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -140,7 +124,7 @@ export default function Calendario() {
         </div>
 
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-peach-300 animate-pulse">Carregando calendário...</div>
+          <div className="h-64 flex items-center justify-center text-peach-300 animate-pulse font-medium">Carregando calendário...</div>
         ) : (
           <>
             <div className="grid grid-cols-7 gap-2 mb-8">
@@ -154,7 +138,6 @@ export default function Calendario() {
                 <div key={`empty-${espaco}`} className="aspect-square" />
               ))}
 
-              {/* [FRONTEND] Criação de botões (dias no calendário) */}
               {diasArray.map((dia) => {
                 const registroDoDia = registros.find(r => r.dataRegistro.getDate() === dia);
 
@@ -214,7 +197,7 @@ export default function Calendario() {
               <div className="text-center mb-6 mt-2">
                 <div className="text-6xl mb-4">{registroSelecionado.emoji}</div>
                 <h3 className="text-2xl font-black text-slate-800">{registroSelecionado.humor}</h3>
-                <p className="text-sm text-slate-400 font-medium mt-1">
+                <p className="text-sm text-slate-400 font-medium mt-1 capitalize">
                   {registroSelecionado.dataRegistro.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
               </div>
@@ -249,7 +232,6 @@ export default function Calendario() {
                 )}
               </div>
 
-              {/* [FRONTEND] Interface para Edição de Registro do dia atual e Trava de Segurança */}
               <div className="flex flex-col gap-3">
                 <div className="flex gap-3">
                   <button 
@@ -284,6 +266,7 @@ export default function Calendario() {
           </div>
         )}
       </AnimatePresence>
+      <BottomNav />
     </div>
   );
 }

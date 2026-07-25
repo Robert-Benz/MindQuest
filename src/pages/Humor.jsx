@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud } from "lucide-react";
+import { ArrowRight, ArrowLeft, MessageCircle, Tag, CloudRain, Sun, Cloud } from "lucide-react"; // 1. ArrowLeft adicionado
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../firebaseConfig";
 import { collection, doc, setDoc, updateDoc, increment } from "firebase/firestore";
@@ -20,17 +20,10 @@ export default function Humor() {
     { emoji: "😁", label: "Radiante", color: "text-yellow-500", question: "Incrível! Qual a melhor notícia?", nivel: 100 },
   ];
 
-  const climas = [
-    { id: "ensolarado", label: "Ensolarado", icon: Sun, cor: "text-yellow-500" },
-    { id: "nublado", label: "Nublado", icon: Cloud, cor: "text-gray-400" },
-    { id: "chuvoso", label: "Chuvoso", icon: CloudRain, cor: "text-sky-400" }
-  ];
-
   const fatores = ["Família", "Trabalho", "Saúde", "Relacionamento", "Estudos", "Finanças", "Lazer", "Sono"];
 
   // Estados
   const [selectedMood, setSelectedMood] = useState(null);
-  const [selectedClima, setSelectedClima] = useState(null); 
   const [note, setNote] = useState("");
   const [selectedFactors, setSelectedFactors] = useState([]);
 
@@ -38,12 +31,6 @@ export default function Humor() {
     if (registroParaEditar) {
       const indexMood = moods.findIndex(m => m.label === registroParaEditar.humor || m.emoji === registroParaEditar.emoji);
       if (indexMood !== -1) setSelectedMood(indexMood);
-
-      if (registroParaEditar.clima?.condicao) {
-        const indexClima = climas.findIndex(c => c.label.toLowerCase() === registroParaEditar.clima.condicao.toLowerCase());
-        if (indexClima !== -1) setSelectedClima(indexClima);
-      }
-
       if (registroParaEditar.nota) setNote(registroParaEditar.nota);
       if (registroParaEditar.fatores) setSelectedFactors(registroParaEditar.fatores);
     }
@@ -56,8 +43,8 @@ export default function Humor() {
   };
 
   const handleSave = async () => {
-    if (selectedMood === null || selectedClima === null) {
-      toast.error("Por favor, selecione o seu humor e o clima lá fora!");
+    if (selectedMood === null) {
+      toast.error("Por favor, selecione o seu humor!");
       return;
     }
 
@@ -73,18 +60,12 @@ export default function Humor() {
       const isFimDeSemana = numeroDia === 0 || numeroDia === 6;
       const tipoDeDia = isFimDeSemana ? "Fim de Semana" : "Dia de Semana";
 
-      const climaMap = {
-        condicao: climas[selectedClima].label, 
-        temperatura: 22, 
-      };
-
       const dadosRegistro = {
         humor: moods[selectedMood].label,
         emoji: moods[selectedMood].emoji,
         nivel: moods[selectedMood].nivel,
         nota: note,
         fatores: selectedFactors,
-        clima: climaMap,
         tipoDia: tipoDeDia,
       };
 
@@ -121,8 +102,13 @@ export default function Humor() {
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-xl bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-peach-300/40 border border-white"
+        className="w-full max-w-xl bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-peach-300/40 border border-white relative"
       >
+          <button onClick={() => navigate("/Calendario")} className="p-2 hover:bg-peach-100 rounded-full transition-colors">
+            <ArrowLeft className="size-6 text-peach-400" />
+          </button>
+
+
         <div className="text-center mb-8">
           <h2 className="text-3xl font-extrabold text-peach-500 tracking-tight">
             {registroParaEditar ? "Editar Check-in" : "Check-in do Sentir"}
@@ -156,29 +142,6 @@ export default function Humor() {
                 <p className="text-sm">{currentMood.question}</p>
               </div>
 
-              {/* Pergunta do Clima */}
-              <div className="space-y-3">
-                <label className="flex items-center gap-2 text-xs font-bold text-peach-400 uppercase ml-2 tracking-widest">
-                  Como está o clima lá fora?
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {climas.map((clima, index) => {
-                    const Icone = clima.icon;
-                    return (
-                      <button
-                        key={clima.id}
-                        onClick={() => setSelectedClima(index)}
-                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 transition-all
-                        ${selectedClima === index ? "bg-peach-50 border-peach-400 shadow-md scale-105" : "bg-slate-50 border-transparent text-gray-400 hover:bg-peach-50/50"}`}
-                      >
-                        <Icone className={`size-6 ${selectedClima === index ? clima.cor : "text-gray-400"}`} />
-                        <span className={`text-[10px] font-bold ${selectedClima === index ? "text-slate-700" : "text-gray-400"}`}>{clima.label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -209,7 +172,7 @@ export default function Humor() {
         </AnimatePresence>
 
         <button
-          disabled={selectedMood === null || selectedClima === null}
+          disabled={selectedMood === null}
           onClick={handleSave}
           className="w-full mt-8 bg-peach-500 hover:bg-peach-400 text-white font-bold py-4 rounded-2xl shadow-lg shadow-peach-300 transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale active:scale-95"
         >

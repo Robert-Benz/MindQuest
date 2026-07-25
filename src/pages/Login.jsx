@@ -71,9 +71,8 @@ export default function Login() {
               onChange={(e) => setSenha(e.target.value)}
               className="w-full p-4 rounded-2xl bg-[#FFF7F4] border border-[#F5DACA] focus:outline-none focus:ring-2 focus:ring-[#FFC9BA] transition-all text-[#7A4E3A] placeholder:text-[#B88B79]"
             />
-            
-            {/* Link de recuperação de senha */}
-            <div className="flex justify-end">
+          
+            {/* <div className="flex justify-end">
               <button
                 type="button"
                 onClick={() => navigate("/recuperar-senha")}
@@ -81,7 +80,7 @@ export default function Login() {
               >
                 Esqueci minha senha
               </button>
-            </div>
+            </div> */}
           </div>
 
           <button
@@ -101,6 +100,16 @@ export default function Login() {
             Cadastre-se
           </button>
         </p>
+
+        <p className="text-center mt-6 text-sm text-[#9A6A58]">
+          <button
+            onClick={() => navigate("/senha")}
+            className="font-bold text-[#FF9B7D] hover:underline"
+          >
+            Esqueci a Senha
+          </button>
+        </p>
+
       </motion.div>
 
       {/* Renderização do nosso PopUp Genérico */}
