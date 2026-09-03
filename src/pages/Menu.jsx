@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  Sparkles, ChevronRight, Activity, TrendingUp, Heart, Clock, Settings, Brain
+  Sparkles, ChevronRight, Activity, TrendingUp, Clock, Settings, Brain, Play, Award, ShoppingBag
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logoReduzido from "../assets/LogoPessegoReduzido.png";
@@ -9,7 +9,7 @@ import BottomNav from "../components/BottomNav";
 import { auth, db } from "../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, collection, query, orderBy, limit, onSnapshot, getDocs } from "firebase/firestore";
-import { gerarInsightDiario } from "../services/aiService"; // Importando a nossa IA!
+import { gerarInsightDiario } from "../services/aiService";
 
 const LogoPrincipal = () => (
   <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10">
@@ -24,9 +24,12 @@ export default function Menu() {
   const [ultimoHumor, setUltimoHumor] = useState(null);
   const [userXP, setUserXP] = useState(0);
 
-  // Estados para a Inteligência Artificial
   const [insightIA, setInsightIA] = useState("");
   const [carregandoInsight, setCarregandoInsight] = useState(false);
+
+  const [relatorioSemanalIA, setRelatorioSemanalIA] = useState(
+    "Sua semana teve uma boa variedade! Nos dias em que choveu, você registrou um humor mais introspectivo e caseiro. Nos dias em que fez exercício físico e o clima estava ensolarado, sua energia e nível de humor subiram bastante comparado ao resto da semana."
+  );
 
   const [humorSemanal, setHumorSemanal] = useState([
     { dia: "Dom", nivel: 0 }, { dia: "Seg", nivel: 0 }, { dia: "Ter", nivel: 0 },
@@ -36,12 +39,10 @@ export default function Menu() {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        setIsModalOpen(true);
         setLoading(false);
         return;
       }
 
-      // 1. ESCUTA O XP
       const userRef = doc(db, "usuarios", user.uid);
       const unsubUser = onSnapshot(userRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -49,43 +50,14 @@ export default function Menu() {
         }
       });
 
-      // 2. ESCUTA O HUMOR (Buscando os últimos 7)
       const humorRef = collection(db, "usuarios", user.uid, "registrosHumor");
       const q = query(humorRef, orderBy("data", "desc"), limit(7));
 
       const unsubHumor = onSnapshot(q, (snapshot) => {
         if (!snapshot.empty) {
           const registros = snapshot.docs.map(d => d.data());
-          
-          const hoje = new Date();
-          let jaRegistrouHoje = false;
           let humorDeHojeOuRecente = registros[0]; 
 
-          for (let reg of registros) {
-            if (reg.data) {
-              let dataRegistro;
-              if (typeof reg.data.toDate === 'function') {
-                dataRegistro = reg.data.toDate();
-              } else if (reg.data.seconds) {
-                dataRegistro = new Date(reg.data.seconds * 1000);
-              } else {
-                dataRegistro = new Date(reg.data);
-              }
-
-              const isHoje = 
-                dataRegistro.getDate() === hoje.getDate() && 
-                dataRegistro.getMonth() === hoje.getMonth() &&
-                dataRegistro.getFullYear() === hoje.getFullYear();
-
-              if (isHoje) {
-                jaRegistrouHoje = true;
-                humorDeHojeOuRecente = reg; 
-                break; 
-              }
-            }
-          }
-
-          setIsModalOpen(!jaRegistrouHoje);
           setUltimoHumor(humorDeHojeOuRecente);
 
           const novoGrafico = [
@@ -108,8 +80,6 @@ export default function Menu() {
           });
           
           setHumorSemanal(novoGrafico);
-        } else {
-          setIsModalOpen(true);
         }
         setLoading(false);
       });
@@ -120,17 +90,14 @@ export default function Menu() {
     return () => unsubscribeAuth();
   }, []);
 
-  // 3. EFEITO DA IA: Dispara assim que confirma que o usuário já registrou o humor de hoje
   useEffect(() => {
     const buscarInsightIA = async () => {
-      // Só roda se o usuário fechou o modal de check-in e ainda não geramos o texto
-      if (ultimoHumor && !isModalOpen && !insightIA) {
+      if (ultimoHumor && !insightIA) {
         setCarregandoInsight(true);
         try {
           const user = auth.currentUser;
           if (!user) return;
 
-          // Busca as preferências cadastradas na subcoleção do usuário
           const subRef = collection(db, "usuarios", user.uid, "respostasFormulario");
           const subSnap = await getDocs(query(subRef, limit(1)));
           
@@ -139,7 +106,6 @@ export default function Menu() {
             respostas = subSnap.docs[0].data().respostas || {};
           }
 
-          // Monta o perfil cruzando com os índices que definimos no Cadastro.jsx
           const dadosPerfil = {
             objetivoPrincipal: respostas["0"] || "Bem-estar",
             generoMusical: respostas["2"] || "Música relaxante",
@@ -147,7 +113,6 @@ export default function Menu() {
             generoLivro: respostas["5"] || "Leitura agradável"
           };
 
-          // Chama a API do Gemini!
           const mensagem = await gerarInsightDiario(dadosPerfil, ultimoHumor);
           setInsightIA(mensagem);
 
@@ -161,7 +126,7 @@ export default function Menu() {
     };
 
     buscarInsightIA();
-  }, [ultimoHumor, isModalOpen, insightIA]);
+  }, [ultimoHumor, insightIA]);
 
   const nivelAtual = Math.floor(userXP / 100) + 1;
   const xpProgresso = userXP % 100;
@@ -171,7 +136,7 @@ export default function Menu() {
   return (
     <div className="min-h-screen bg-[#FFFBF9] flex flex-col antialiased text-slate-800 pb-28">
       
-      <header className="fixed top-0 left-0 right-0 z-40 bg-[#FFFBF9]/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-slate-100">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-[#FFFBF9]/85 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-slate-100">
         <div className="flex items-center gap-3">
           <LogoPrincipal />
           <div>
@@ -203,17 +168,24 @@ export default function Menu() {
         </div>
       </header>
 
-      <main className={`pt-24 px-6 space-y-8 transition-all duration-500 ${isModalOpen ? 'blur-[1.5px] opacity-70' : 'blur-0'}`}>
+      <main className="pt-24 px-6 space-y-8 max-w-2xl mx-auto w-full">
         
-        <div className="space-y-1">
-          <p className="text-[#E97451] font-bold text-[10px] uppercase tracking-widest">Painel de Evolução</p>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {ultimoHumor && !isModalOpen ? `Você está ${ultimoHumor.humor}` : "Sua Jornada"}
-          </h1>
+        <div className="flex justify-between items-center">
+          <div className="space-y-1">
+            <p className="text-[#E97451] font-bold text-[10px] uppercase tracking-widest">Painel de Evolução</p>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              {ultimoHumor ? `Você está ${ultimoHumor.humor}` : "Sua Jornada"}
+            </h1>
+          </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="text-xs bg-peach-100 text-peach-600 font-bold px-4 py-2.5 rounded-2xl shadow-sm hover:bg-peach-200 transition-all"
+          >
+            Abrir Check-in
+          </button>
         </div>
 
-        {/* --- NOVO: CARD DE INSIGHT DA INTELIGÊNCIA ARTIFICIAL --- */}
-        {ultimoHumor && !isModalOpen && (
+        {ultimoHumor && (
           <motion.div 
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -234,7 +206,6 @@ export default function Menu() {
               <div className="space-y-2 animate-pulse">
                 <div className="h-3 bg-peach-200/50 rounded-full w-full"></div>
                 <div className="h-3 bg-peach-200/50 rounded-full w-5/6"></div>
-                <div className="h-3 bg-peach-200/50 rounded-full w-4/6"></div>
               </div>
             ) : (
               <p className="text-sm text-slate-700 leading-relaxed font-medium relative z-10">
@@ -243,7 +214,6 @@ export default function Menu() {
             )}
           </motion.div>
         )}
-        {/* -------------------------------------------------------- */}
 
         <section className="bg-white p-6 rounded-[2.5rem] border border-white shadow-sm space-y-6 text-center">
           <div className="flex justify-between items-center">
@@ -269,19 +239,62 @@ export default function Menu() {
           </div>
         </section>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-peach-100 p-5 rounded-[2rem] flex flex-col justify-between h-36 relative shadow-md">
-            <Activity className="text-peach-200 absolute -right-2 -top-2" size={60} />
-            <p className="text-peach-400 text-[10px] font-bold uppercase tracking-wider">Humor Atual</p>
-            <p className="text-peach-600 text-4xl font-black">{ultimoHumor ? ultimoHumor.emoji : "--"}</p>
+        <motion.section 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white p-6 rounded-[2.5rem] border border-peach-100 shadow-sm space-y-3 relative overflow-hidden"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="bg-orange-100 p-2 rounded-xl">
+                <Sparkles className="size-4 text-orange-500" />
+              </div>
+              <h3 className="font-extrabold text-slate-800 text-sm">Relatório Semanal da IA</h3>
+            </div>
+            <span className="text-[10px] bg-orange-50 text-orange-600 font-bold px-2.5 py-1 rounded-full border border-orange-100">Exemplo Prévio</span>
           </div>
-          <div className="bg-white p-5 rounded-[2rem] border border-peach-100 shadow-md flex flex-col justify-between h-36">
-            <div className="flex justify-between"><Clock className="text-peach-200 size-5" /></div>
-            <div>
-              <p className="text-peach-400 text-[10px] font-bold uppercase tracking-wider">Meditação</p>
-              <p className="text-peach-300 text-3xl font-black">0m</p>
+
+          <p className="text-xs text-slate-600 leading-relaxed font-medium">
+            "{relatorioSemanalIA}"
+          </p>
+        </motion.section>
+
+        {/* --- GRID DE AÇÕES RÁPIDAS --- */}
+        <div className="grid grid-cols-2 gap-4">
+          
+          <div onClick={() => navigate("/humor")} className="bg-peach-100 p-5 rounded-[2rem] flex flex-col justify-between h-40 relative shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden group">
+            <Activity className="text-peach-200 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" size={70} />
+            <span className="text-peach-500 text-[10px] font-bold uppercase tracking-widest relative z-10">Humor Atual</span>
+            <span className="text-peach-600 text-4xl font-black relative z-10">{ultimoHumor ? ultimoHumor.emoji : "--"}</span>
+          </div>
+
+          <div onClick={() => navigate("/meditacao")} className="bg-white p-5 rounded-[2rem] border border-peach-100 flex flex-col justify-between h-40 relative shadow-sm hover:border-peach-300 transition-all cursor-pointer overflow-hidden group">
+            <Clock className="text-slate-50 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" size={70} />
+            <div className="flex justify-between items-center relative z-10">
+              <span className="text-peach-400 text-[10px] font-bold uppercase tracking-widest">Meditação</span>
+            </div>
+            <div className="relative z-10">
+              <span className="block text-slate-700 text-2xl font-black leading-none mt-1">0m</span>
+              <span className="text-[10px] text-slate-400 font-bold mt-1">Hoje</span>
             </div>
           </div>
+
+          <div onClick={() => navigate("/conquistas")} className="bg-gradient-to-br from-orange-400 to-[#E97451] p-5 rounded-[2rem] flex flex-col justify-between h-40 relative shadow-md hover:shadow-lg transition-all cursor-pointer overflow-hidden text-white group">
+            <Award className="text-white/20 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" size={70} />
+            <span className="text-orange-100 text-[10px] font-bold uppercase tracking-widest relative z-10">Troféus</span>
+            <div className="relative z-10">
+              <span className="block text-white text-xl font-black leading-tight">Ver<br/>Badges</span>
+            </div>
+          </div>
+
+          <div onClick={() => navigate("/loja")} className="bg-white p-5 rounded-[2rem] border border-peach-100 flex flex-col justify-between h-40 relative shadow-sm hover:border-peach-300 transition-all cursor-pointer overflow-hidden group">
+            <ShoppingBag className="text-peach-50 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" size={70} />
+            <span className="text-peach-400 text-[10px] font-bold uppercase tracking-widest relative z-10">Recompensas</span>
+            <div className="relative z-10">
+              <span className="block text-slate-700 text-xl font-black leading-tight">Loja<br/>Zen</span>
+            </div>
+          </div>
+
         </div>
       </main>
 

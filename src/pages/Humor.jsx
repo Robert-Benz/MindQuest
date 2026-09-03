@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud } from "lucide-react";
+import { ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud, Moon, Users, Activity, Coffee } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../firebaseConfig";
 import { collection, doc, setDoc, updateDoc, increment } from "firebase/firestore";
@@ -14,11 +14,14 @@ export default function Humor() {
   const [selectedFactors, setSelectedFactors] = useState([]);
 
   const moods = [
-    { emoji: "😡", label: "Raiva", color: "text-rose-400", question: "O que te tirou do sério hoje?", nivel: 20 },
+    { emoji: "😡", label: "Raiva", color: "text-rose-500", question: "O que te tirou do sério hoje?", nivel: 10 },
+    { emoji: "😰", label: "Ansioso", color: "text-amber-500", question: "O que está gerando essa ansiedade?", nivel: 25 },
     { emoji: "😢", label: "Triste", color: "text-sky-400", question: "Sinto muito... quer contar o que houve?", nivel: 40 },
+    { emoji: "🥱", label: "Cansado", color: "text-purple-400", question: "Dia puxado? Precisa de descanso?", nivel: 50 },
     { emoji: "😐", label: "Neutro", color: "text-gray-400", question: "Um dia comum? O que aconteceu?", nivel: 60 },
-    { emoji: "😊", label: "Feliz", color: "text-peach-500", question: "Que bom! O que trouxe esse sorriso?", nivel: 80 },
-    { emoji: "😁", label: "Radiante", color: "text-yellow-500", question: "Incrível! Qual a melhor notícia?", nivel: 100 },
+    { emoji: "🍃", label: "Tranquilo", color: "text-emerald-500", question: "Que ótimo! O que trouxe essa paz?", nivel: 75 },
+    { emoji: "😊", label: "Feliz", color: "text-peach-500", question: "Que bom! O que trouxe esse sorriso?", nivel: 90 },
+    { emoji: "✨", label: "Radiante", color: "text-yellow-500", question: "Incrível! Qual a melhor notícia?", nivel: 100 },
   ];
 
   const climas = [
@@ -27,7 +30,28 @@ export default function Humor() {
     { id: "chuvoso", label: "Chuvoso", icon: CloudRain, cor: "text-sky-400" }
   ];
 
-  const fatores = ["Família", "Trabalho", "Saúde", "Relacionamento", "Estudos", "Finanças", "Lazer", "Sono"];
+const categoriasFatores = [
+    {
+      titulo: "Sono & Corpo",
+      icone: Moon,
+      itens: ["Sono Ruim", "Sono Reparador", "Insônia", "Tensão Muscular", "Dor de Cabeça", "Dor Física", "Cólicas"]
+    },
+    {
+      titulo: "Mente & Emoções",
+       icone: Activity,
+      itens: ["Mente Acelerada", "Estresse Alto", "Sensível / Emotivo", "Foco Produtivo", "Falta de Foco", "Motivado"]
+    },
+    {
+      titulo: "Vida Social",
+       icone: Users,
+      itens: ["Socializei Bastante", "Encontro com Amigos", "Tempo em Família", "Isolado / Sozinho", "Atrito Social", "Conversa Agradável"]
+    },
+    {
+      titulo: "Hábitos & Rotina",
+       icone: Coffee,
+      itens: ["Exercício Físico", "Boa Alimentação", "Junk Food / Doces", "Café em Excesso", "Álcool", "Estudos Intensos", "Trabalho Pesado"]
+    }
+  ];
 
   const toggleFactor = (factor) => {
     setSelectedFactors((prev) =>
@@ -48,13 +72,11 @@ export default function Humor() {
         return;
       }
 
-      // Descobre automaticamente se é Dia de Semana ou Fim de Semana
       const hoje = new Date();
       const numeroDia = hoje.getDay(); 
       const isFimDeSemana = numeroDia === 0 || numeroDia === 6;
       const tipoDeDia = isFimDeSemana ? "Fim de Semana" : "Dia de Semana";
 
-      // MANTENDO A SUA ESTRUTURA ORIGINAL EM FORMATO DE MAPA/OBJETO
       const climaMap = {
         condicao: climas[selectedClima].label, 
         temperatura: 22, 
@@ -70,8 +92,8 @@ export default function Humor() {
         nota: note,
         fatores: selectedFactors,
         data: hoje,
-        clima: climaMap, // Mantém a estrutura de objeto original
-        tipoDia: tipoDeDia, // Adiciona a nova variável para a IA
+        clima: climaMap,
+        tipoDia: tipoDeDia,
       });
 
       const userRef = doc(db, "usuarios", user.uid);
@@ -101,16 +123,17 @@ export default function Humor() {
         </div>
 
         {/* Seleção de Humor */}
-        <div className="grid grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-4 gap-3 mb-8">
           {moods.map((mood, index) => (
             <button
               key={index}
+              type="button"
               onClick={() => setSelectedMood(index)}
-              className={`flex flex-col items-center gap-2 p-3 rounded-3xl border-2 transition-all duration-200
-              ${selectedMood === index ? `bg-peach-100 border-peach-200 scale-110 shadow-lg ${mood.color}` : "bg-peach-50 border-transparent opacity-60 hover:opacity-100"}`}
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-3xl border-2 transition-all duration-200
+              ${selectedMood === index ? `bg-peach-100 border-peach-200 scale-105 shadow-md ${mood.color}` : "bg-peach-50/70 border-transparent opacity-60 hover:opacity-100"}`}
             >
-              <span className="text-4xl md:text-5xl">{mood.emoji}</span>
-              <span className="text-[10px] font-bold uppercase tracking-tighter">{mood.label}</span>
+              <span className="text-3xl md:text-4xl">{mood.emoji}</span>
+              <span className="text-[10px] font-bold uppercase tracking-tighter truncate w-full text-center">{mood.label}</span>
             </button>
           ))}
         </div>
@@ -120,7 +143,7 @@ export default function Humor() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
               
               <div className="flex items-center gap-2 text-peach-500 font-semibold bg-peach-100 p-4 rounded-2xl border border-peach-200">
-                <MessageCircle className="size-5" />
+                <MessageCircle className="size-5 shrink-0" />
                 <p className="text-sm">{currentMood.question}</p>
               </div>
 
@@ -135,6 +158,7 @@ export default function Humor() {
                     return (
                       <button
                         key={clima.id}
+                        type="button"
                         onClick={() => setSelectedClima(index)}
                         className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 transition-all
                         ${selectedClima === index ? "bg-peach-50 border-peach-400 shadow-md scale-105" : "bg-slate-50 border-transparent text-gray-400 hover:bg-peach-50/50"}`}
@@ -154,21 +178,37 @@ export default function Humor() {
                 className="w-full h-24 p-5 bg-peach-50 border-none rounded-3xl focus:ring-2 focus:ring-peach-400 transition-all resize-none shadow-inner outline-none text-sm"
               />
 
-              <div className="space-y-3">
+              {/* Fatores Categorizados */}
+              <div className="space-y-4">
                 <label className="flex items-center gap-2 text-xs font-bold text-peach-400 uppercase ml-2 tracking-widest">
                   <Tag className="size-3" /> O que impactou o seu dia?
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {fatores.map((fator) => (
-                    <button
-                      key={fator}
-                      onClick={() => toggleFactor(fator)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all border
-                      ${selectedFactors.includes(fator) ? "bg-peach-500 text-white border-peach-500 shadow-md" : "bg-peach-50 text-gray-500 border-peach-100 hover:border-peach-300"}`}
-                    >
-                      {fator}
-                    </button>
-                  ))}
+                
+                <div className="space-y-3 bg-peach-50/50 p-4 rounded-3xl border border-peach-100">
+                  {categoriasFatores.map((cat, catIdx) => {
+                    const IconCat = cat.icone;
+                    return (
+                      <div key={catIdx} className="space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 ml-1">
+                          <IconCat className="size-3.5 text-peach-500" />
+                          <span>{cat.titulo}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {cat.itens.map((fator) => (
+                            <button
+                              key={fator}
+                              type="button"
+                              onClick={() => toggleFactor(fator)}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border
+                              ${selectedFactors.includes(fator) ? "bg-peach-500 text-white border-peach-500 shadow-sm" : "bg-white text-gray-600 border-slate-200 hover:border-peach-300"}`}
+                            >
+                              {fator}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -177,6 +217,7 @@ export default function Humor() {
         </AnimatePresence>
 
         <button
+          type="button"
           disabled={selectedMood === null || selectedClima === null}
           onClick={handleSave}
           className="w-full mt-8 bg-peach-500 hover:bg-peach-400 text-white font-bold py-4 rounded-2xl shadow-lg shadow-peach-300 transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale active:scale-95"
