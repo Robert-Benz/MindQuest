@@ -5,7 +5,7 @@ import {
   DollarSign, Save, ChevronRight, Sparkles 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { auth, db } from "../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, addDoc } from "firebase/firestore";
 import { toast } from "sonner";

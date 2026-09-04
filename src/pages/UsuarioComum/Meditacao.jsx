@@ -17,9 +17,9 @@ import {
 import { motion } from "framer-motion";
 import ReactPlayer from "react-player";
 
-import BottomNav from "../components/BottomNav";
+import BottomNav from "../../components/BottomNav";
 
-import { auth, db } from "../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 import { doc, updateDoc, increment } from "firebase/firestore";
 
 import { toast } from "sonner";

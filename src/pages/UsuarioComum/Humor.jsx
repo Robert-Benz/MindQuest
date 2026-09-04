@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud, Moon, Users, Activity, Coffee } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { auth, db } from "../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 import { collection, doc, setDoc, updateDoc, increment } from "firebase/firestore";
 import { toast } from "sonner";
 

@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  Sparkles, ChevronRight, Activity, TrendingUp, Clock, Settings, Brain, Play, Award, ShoppingBag
+  Sparkles, ChevronRight, Activity, TrendingUp, Clock, 
+  Settings, Brain, Award, ShoppingBag, Search, BookOpen, HeartPulse 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import logoReduzido from "../assets/LogoPessegoReduzido.png";
-import BottomNav from "../components/BottomNav";
-import { auth, db } from "../firebaseConfig";
+import logoReduzido from "../../assets/LogoPessegoReduzido.png";
+import BottomNav from "../../components/BottomNav";
+import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, collection, query, orderBy, limit, onSnapshot, getDocs } from "firebase/firestore";
-import { gerarInsightDiario } from "../services/aiService";
+import { gerarInsightDiario } from "../../services/aiService";
 
 const LogoPrincipal = () => (
   <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10">
@@ -27,7 +28,7 @@ export default function Menu() {
   const [insightIA, setInsightIA] = useState("");
   const [carregandoInsight, setCarregandoInsight] = useState(false);
 
-  const [relatorioSemanalIA, setRelatorioSemanalIA] = useState(
+  const [relatorioSemanalIA] = useState(
     "Sua semana teve uma boa variedade! Nos dias em que choveu, você registrou um humor mais introspectivo e caseiro. Nos dias em que fez exercício físico e o clima estava ensolarado, sua energia e nível de humor subiram bastante comparado ao resto da semana."
   );
 
@@ -259,39 +260,82 @@ export default function Menu() {
           </p>
         </motion.section>
 
-        {/* --- GRID DE AÇÕES RÁPIDAS --- */}
+        {/* Banner Buscar Profissionais */}
+        <motion.div
+          whileHover={{ y: -3 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate("/BuscarProfissionais")}
+          className="bg-gradient-to-r from-amber-500 via-orange-500 to-[#E97451] p-6 rounded-[2.2rem] shadow-lg shadow-orange-500/25 cursor-pointer relative overflow-hidden flex items-center justify-between text-white group"
+        >
+          <div className="absolute -right-6 -bottom-6 opacity-20 group-hover:scale-110 transition-transform duration-500">
+            <Search size={120} />
+          </div>
+          
+          <div className="relative z-10 space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-100 block">Rede de Apoio</span>
+            <h3 className="text-xl font-black leading-tight">Buscar Profissional<br />e Agendar Sessão</h3>
+          </div>
+          
+          <div className="relative z-10 bg-white/20 p-3 rounded-2xl backdrop-blur-md group-hover:bg-white/30 transition-colors">
+            <ChevronRight className="size-6 text-white" />
+          </div>
+        </motion.div>
+
+        {/* Grid de Ações Rápidas - Todos em Amarelo Pastel bem clarinho */}
         <div className="grid grid-cols-2 gap-4">
           
-          <div onClick={() => navigate("/humor")} className="bg-peach-100 p-5 rounded-[2rem] flex flex-col justify-between h-40 relative shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden group">
-            <Activity className="text-peach-200 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" size={70} />
-            <span className="text-peach-500 text-[10px] font-bold uppercase tracking-widest relative z-10">Humor Atual</span>
-            <span className="text-peach-600 text-4xl font-black relative z-10">{ultimoHumor ? ultimoHumor.emoji : "--"}</span>
+          {/* Humor Atual */}
+          <div onClick={() => navigate("/humor")} className="bg-[#FFFDF4] p-5 rounded-[2.2rem] border border-amber-100/90 flex flex-col justify-between h-40 relative shadow-sm hover:border-amber-200 transition-all cursor-pointer overflow-hidden group">
+            <Activity className="text-amber-200/50 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" size={70} />
+            <span className="text-amber-600 text-[10px] font-bold uppercase tracking-widest relative z-10">Humor Atual</span>
+            <span className="text-slate-800 text-4xl font-black relative z-10">{ultimoHumor ? ultimoHumor.emoji : "--"}</span>
           </div>
 
-          <div onClick={() => navigate("/meditacao")} className="bg-white p-5 rounded-[2rem] border border-peach-100 flex flex-col justify-between h-40 relative shadow-sm hover:border-peach-300 transition-all cursor-pointer overflow-hidden group">
-            <Clock className="text-slate-50 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" size={70} />
+          {/* Meditação */}
+          <div onClick={() => navigate("/meditacao")} className="bg-[#FFFDF4] p-5 rounded-[2.2rem] border border-amber-100/90 flex flex-col justify-between h-40 relative shadow-sm hover:border-amber-200 transition-all cursor-pointer overflow-hidden group">
+            <Clock className="text-amber-200/50 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" size={70} />
             <div className="flex justify-between items-center relative z-10">
-              <span className="text-peach-400 text-[10px] font-bold uppercase tracking-widest">Meditação</span>
+              <span className="text-amber-600 text-[10px] font-bold uppercase tracking-widest">Meditação</span>
             </div>
             <div className="relative z-10">
-              <span className="block text-slate-700 text-2xl font-black leading-none mt-1">0m</span>
+              <span className="block text-slate-800 text-2xl font-black leading-none mt-1">0m</span>
               <span className="text-[10px] text-slate-400 font-bold mt-1">Hoje</span>
             </div>
           </div>
 
-          <div onClick={() => navigate("/conquistas")} className="bg-gradient-to-br from-orange-400 to-[#E97451] p-5 rounded-[2rem] flex flex-col justify-between h-40 relative shadow-md hover:shadow-lg transition-all cursor-pointer overflow-hidden text-white group">
-            <Award className="text-white/20 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" size={70} />
-            <span className="text-orange-100 text-[10px] font-bold uppercase tracking-widest relative z-10">Troféus</span>
+          {/* Diário Emocional */}
+          <div onClick={() => navigate("/diario")} className="bg-[#FFFDF4] p-5 rounded-[2.2rem] border border-amber-100/90 flex flex-col justify-between h-40 relative shadow-sm hover:border-amber-200 transition-all cursor-pointer overflow-hidden group">
+            <BookOpen className="text-amber-200/50 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" size={70} />
+            <span className="text-amber-600 text-[10px] font-bold uppercase tracking-widest relative z-10">Reflexão</span>
             <div className="relative z-10">
-              <span className="block text-white text-xl font-black leading-tight">Ver<br/>Badges</span>
+              <span className="block text-slate-800 text-xl font-black leading-tight">Diário<br/>Emocional</span>
             </div>
           </div>
 
-          <div onClick={() => navigate("/loja")} className="bg-white p-5 rounded-[2rem] border border-peach-100 flex flex-col justify-between h-40 relative shadow-sm hover:border-peach-300 transition-all cursor-pointer overflow-hidden group">
-            <ShoppingBag className="text-peach-50 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" size={70} />
-            <span className="text-peach-400 text-[10px] font-bold uppercase tracking-widest relative z-10">Recompensas</span>
+          {/* SOS / Respiração */}
+          <div onClick={() => navigate("/sos")} className="bg-[#FFFDF4] p-5 rounded-[2.2rem] border border-amber-100/90 flex flex-col justify-between h-40 relative shadow-sm hover:border-amber-200 transition-all cursor-pointer overflow-hidden group">
+            <HeartPulse className="text-amber-200/50 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" size={70} />
+            <span className="text-amber-600 text-[10px] font-bold uppercase tracking-widest relative z-10">Emergência</span>
             <div className="relative z-10">
-              <span className="block text-slate-700 text-xl font-black leading-tight">Loja<br/>Zen</span>
+              <span className="block text-slate-800 text-xl font-black leading-tight">Espaço<br/>SOS / Calma</span>
+            </div>
+          </div>
+
+          {/* Troféus */}
+          <div onClick={() => navigate("/conquistas")} className="bg-[#FFFDF4] p-5 rounded-[2.2rem] border border-amber-100/90 flex flex-col justify-between h-40 relative shadow-sm hover:border-amber-200 transition-all cursor-pointer overflow-hidden group">
+            <Award className="text-amber-200/50 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" size={70} />
+            <span className="text-amber-600 text-[10px] font-bold uppercase tracking-widest relative z-10">Troféus</span>
+            <div className="relative z-10">
+              <span className="block text-slate-800 text-xl font-black leading-tight">Ver<br/>Badges</span>
+            </div>
+          </div>
+
+          {/* Loja Zen */}
+          <div onClick={() => navigate("/loja")} className="bg-[#FFFDF4] p-5 rounded-[2.2rem] border border-amber-100/90 flex flex-col justify-between h-40 relative shadow-sm hover:border-amber-200 transition-all cursor-pointer overflow-hidden group">
+            <ShoppingBag className="text-amber-200/50 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" size={70} />
+            <span className="text-amber-600 text-[10px] font-bold uppercase tracking-widest relative z-10">Recompensas</span>
+            <div className="relative z-10">
+              <span className="block text-slate-800 text-xl font-black leading-tight">Loja<br/>Zen</span>
             </div>
           </div>
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles,
@@ -9,13 +10,20 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import AnimatedBrainLogo from "../components/AnimatedBrainLogo";
+import AnimatedBrainLogo from "../../components/AnimatedBrainLogo";
+import BloomIntro from "../../components/BloomIntro";
 
 export default function Home() {
   const navigate = useNavigate();
 
+  // Enquanto isso é false, a BloomIntro fica por cima de tudo: a logo brota
+  // e depois a cor da marca toma conta da tela. Quando termina, ela chama
+  // onComplete e o resto da Home (que já está montado por baixo) aparece.
+  const [introDone, setIntroDone] = useState(false);
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#fff8f5] via-white to-[#ffe8de] text-gray-800 antialiased">
+      {!introDone && <BloomIntro onComplete={() => setIntroDone(true)} />}
 
       <motion.div
         animate={{

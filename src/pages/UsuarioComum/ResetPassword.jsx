@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, ArrowLeft, KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
-import { auth } from "../firebaseConfig";
+import { auth } from "../../firebaseConfig";
 import { sendPasswordResetEmail } from "firebase/auth";
 
 export default function RecuperarSenha() {

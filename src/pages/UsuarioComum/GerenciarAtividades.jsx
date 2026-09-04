@@ -5,7 +5,7 @@ import {
   CheckCircle2, Circle, Sparkles, CalendarHeart 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { auth, db } from "../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { 
   collection, addDoc, getDocs, updateDoc, 

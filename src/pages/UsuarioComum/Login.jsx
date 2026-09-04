@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LogIn } from "lucide-react";
-import { auth } from "../firebaseConfig";
+import { auth } from "../../firebaseConfig";
 import { signInWithEmailAndPassword } from "firebase/auth";
 
 // Importações dos nossos novos arquivos de erro
-import PopUpGenerico from "../components/PopUpGenerico";
-import { mapearErroFirebase } from "../utils/firebaseErrors";
+import PopUpGenerico from "../../components/PopUpGenerico";
+import { mapearErroFirebase } from "../../utils/firebaseErrors";
 
 export default function Login() {
   const navigate = useNavigate();

@@ -6,34 +6,55 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   User, Mail, Heart, Film, Music, Sparkles, ArrowLeft, Save,
   CheckCircle2, Camera, Users, UserPlus, Trash2, Flame, Award,
-  Bell, Lock, HelpCircle, Sun, Shield, ChevronRight, Pencil,
-  Check, X, Clock3, Headphones, Smile, Send, Accessibility, ShieldCheck
+  Bell, Lock, HelpCircle, ChevronRight, Pencil, KeyRound,
+  Check, X, Clock3, Headphones, Smile, Send, Accessibility, ShieldCheck,
+  Stethoscope, MessageSquare, Paperclip, FileText, LogOut, Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { auth, db } from "../firebaseConfig";
-import { onAuthStateChanged, updateEmail } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from "firebase/firestore";
+import { auth, db } from "../../firebaseConfig";
+import { onAuthStateChanged, updateEmail, updatePassword, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc, query, orderBy, onSnapshot } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
+import BottomNav from "../../components/BottomNav";
 
-/* =========================================================
-   VALIDAÇÃO
-========================================================= */
+// Validação com Zod
 const schema = z.object({
   nome: z.string().min(3, "Como podemos te chamar?"),
   email: z.string().email("Insira um e-mail válido"),
-  objetivoPrincipal: z.string().min(1, "Escolha seu objetivo"),
-  generoMusical: z.string().min(1, "Escolha um estilo musical"),
-  generoFilme: z.string().min(1, "Escolha um estilo de filme"),
-  momentoFavorito: z.string().min(1, "Escolha seu momento favorito"),
 });
 
-/* =========================================================
-   SELECT PERSONALIZADO
-========================================================= */
-function CustomSelect({ value, onChange, placeholder, options, icon: Icon }) {
+// Componente CustomSelect com suporte a Múltipla Escolha (isMulti)
+function CustomSelect({ value = [], onChange, placeholder, options, icon: Icon, isMulti = false }) {
   const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = options.find((option) => option.value === value);
+
+  const handleSelect = (optionValue) => {
+    if (isMulti) {
+      const currentArray = Array.isArray(value) ? value : [];
+      if (currentArray.includes(optionValue)) {
+        onChange(currentArray.filter((v) => v !== optionValue));
+      } else {
+        onChange([...currentArray, optionValue]);
+      }
+    } else {
+      onChange(optionValue);
+      setIsOpen(false);
+    }
+  };
+
+  const getDisplayLabel = () => {
+    if (isMulti) {
+      const currentArray = Array.isArray(value) ? value : [];
+      if (currentArray.length === 0) return placeholder;
+      if (currentArray.length === 1) return options.find((o) => o.value === currentArray[0])?.label;
+      return `${currentArray.length} opções selecionadas`;
+    } else {
+      const selectedOption = options.find((o) => o.value === value);
+      return selectedOption ? selectedOption.label : placeholder;
+    }
+  };
+
+  const temSelecao = isMulti ? (Array.isArray(value) && value.length > 0) : !!value;
 
   return (
     <div className="relative w-full text-left">
@@ -45,12 +66,12 @@ function CustomSelect({ value, onChange, placeholder, options, icon: Icon }) {
         }`}
       >
         {Icon && (
-          <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 size-5 ${selectedOption ? "text-orange-400" : "text-slate-400"}`} />
+          <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 size-5 ${temSelecao ? "text-orange-400" : "text-slate-400"}`} />
         )}
-        <span className={`text-sm text-left ${selectedOption ? "text-slate-700 font-semibold" : "text-slate-400"}`}>
-          {selectedOption ? selectedOption.label : placeholder}
+        <span className={`text-sm text-left truncate pr-2 ${temSelecao ? "text-slate-700 font-semibold" : "text-slate-400"}`}>
+          {getDisplayLabel()}
         </span>
-        <ChevronRight className={`size-4 text-slate-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+        <ChevronRight className={`size-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
       </button>
 
       <AnimatePresence>
@@ -60,23 +81,26 @@ function CustomSelect({ value, onChange, placeholder, options, icon: Icon }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -5, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="absolute z-50 mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-900/10 overflow-hidden p-1.5 max-h-72 overflow-y-auto"
+            className="absolute z-50 mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-900/10 overflow-hidden p-1.5 max-h-56 overflow-y-auto custom-scrollbar"
           >
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
-                  value === option.value ? "bg-orange-50 text-orange-600 font-semibold" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
+            {options.map((option) => {
+              const currentArray = Array.isArray(value) ? value : [];
+              const isSelected = isMulti ? currentArray.includes(option.value) : value === option.value;
+              
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleSelect(option.value)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm transition-all ${
+                    isSelected ? "bg-orange-50 text-orange-600 font-semibold" : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {isSelected && isMulti && <Check size={14} className="text-orange-500" />}
+                </button>
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>
@@ -84,9 +108,7 @@ function CustomSelect({ value, onChange, placeholder, options, icon: Icon }) {
   );
 }
 
-/* =========================================================
-   CAMPO EDITÁVEL (NOME E EMAIL)
-========================================================= */
+// Campo editável
 function EditableField({ icon: Icon, label, type = "text", editing, register, onEdit, onCancel, onConfirm }) {
   return (
     <div className="space-y-2">
@@ -148,9 +170,7 @@ function EditableField({ icon: Icon, label, type = "text", editing, register, on
   );
 }
 
-/* =========================================================
-   COMPONENTE TOGGLE (CHAVINHA)
-========================================================= */
+// Componente Toggle
 function ToggleSwitch({ checked, onChange }) {
   return (
     <button
@@ -169,13 +189,10 @@ function ToggleSwitch({ checked, onChange }) {
   );
 }
 
-/* =========================================================
-   PERFIL PRINCIPAL
-========================================================= */
 export default function Perfil() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [abaAtiva, setAbaAtiva] = useState("perfil");
+  const [abaAtiva, setAbaAtiva] = useState("perfil"); 
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
   const [userXP, setUserXP] = useState(0);
 
@@ -190,25 +207,39 @@ export default function Perfil() {
   
   const [dadosOriginais, setDadosOriginais] = useState({ nome: "", email: "" });
 
-  // ESTADOS DOS MODAIS (POP-UPS)
+  // Estados dos Selects Múltiplos
+  const [objetivos, setObjetivos] = useState([]);
+  const [generosMusicais, setGenerosMusicais] = useState([]);
+  const [generosFilmes, setGenerosFilmes] = useState([]);
+  const [momentosFavoritos, setMomentosFavoritos] = useState([]);
+
+  // Estados do Terapeuta e Chat
+  const [terapeutaVinculado, setTerapeutaVinculado] = useState(null);
+  const [codigoTerapeutaInput, setCodigoTerapeutaInput] = useState("");
+  const [mensagensChat, setMensagensChat] = useState([]);
+  const [novaMensagem, setNovaMensagem] = useState("");
+
+  // Modais
   const [modalNotificacoes, setModalNotificacoes] = useState(false);
   const [modalPrivacidade, setModalPrivacidade] = useState(false);
   const [modalAjuda, setModalAjuda] = useState(false);
+  const [modalSenha, setModalSenha] = useState(false);
 
-  // ESTADOS INTERNOS DOS MODAIS (Simulação para o TCC)
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
+
   const [notifMeditacao, setNotifMeditacao] = useState(true);
   const [horarioMeditacao, setHorarioMeditacao] = useState("08:00"); 
   const [notifDiario, setNotifDiario] = useState(true);
   const [horarioDiario, setHorarioDiario] = useState("20:00"); 
   const [compartilharPsicologo, setCompartilharPsicologo] = useState(false);
-  
-  // ESTADO PARA O ASSUNTO DA CENTRAL DE AJUDA
   const [assuntoAjuda, setAssuntoAjuda] = useState("");
 
   const { register, handleSubmit, control, reset, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      nome: "", email: "", objetivoPrincipal: "", generoMusical: "", generoFilme: "", momentoFavorito: "noite",
+      nome: "", email: "",
     },
   });
 
@@ -222,10 +253,6 @@ export default function Perfil() {
       try {
         let nomeAtual = "";
         let emailAtual = user.email || "";
-        let objetivoAtual = "";
-        let musicaAtual = "";
-        let filmeAtual = "";
-        let momentoAtual = "noite";
 
         const userDocRef = doc(db, "usuarios", user.uid);
         const userDocSnap = await getDoc(userDocRef);
@@ -236,15 +263,18 @@ export default function Perfil() {
           emailAtual = dados.email || user.email || "";
           setUserXP(dados.xp || 0);
           if (dados.fotoURL) setFotoURL(dados.fotoURL);
-          objetivoAtual = dados.objetivoPrincipal || "";
-          musicaAtual = dados.generoMusical || "";
-          filmeAtual = dados.generoFilme || "";
-          momentoAtual = dados.momentoFavorito || "noite";
+
+          // Tratamento para suportar tanto array novo quanto string antiga
+          setObjetivos(dados.objetivos || (dados.objetivoPrincipal ? [dados.objetivoPrincipal] : []));
+          setGenerosMusicais(dados.generosMusicais || (dados.generoMusical ? [dados.generoMusical] : []));
+          setGenerosFilmes(dados.generosFilmes || (dados.generoFilme ? [dados.generoFilme] : []));
+          setMomentosFavoritos(dados.momentosFavoritos || (dados.momentoFavorito ? [dados.momentoFavorito] : []));
+
+          if (dados.terapeuta) setTerapeutaVinculado(dados.terapeuta);
         }
 
         setDadosOriginais({ nome: nomeAtual, email: emailAtual });
 
-        // Buscar Amigos
         const amigosRef = collection(db, "usuarios", user.uid, "amigos");
         const amigosSnap = await getDocs(amigosRef);
         const amigosCarregados = amigosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -253,10 +283,6 @@ export default function Perfil() {
         reset({
           nome: nomeAtual,
           email: emailAtual,
-          objetivoPrincipal: objetivoAtual,
-          generoMusical: musicaAtual,
-          generoFilme: filmeAtual,
-          momentoFavorito: momentoAtual,
         });
 
       } catch (error) {
@@ -269,6 +295,102 @@ export default function Perfil() {
 
     return () => unsubscribe();
   }, [navigate, reset]);
+
+  // Carregar mensagens do Chat em tempo real
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user || !terapeutaVinculado) return;
+
+    const chatRef = collection(db, "usuarios", user.uid, "chatTerapeuta");
+    const q = query(chatRef, orderBy("data", "asc"));
+
+    const unsubscribeChat = onSnapshot(q, (snapshot) => {
+      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMensagensChat(msgs);
+    });
+
+    return () => unsubscribeChat();
+  }, [terapeutaVinculado]);
+
+  const handleLogOut = async () => {
+    try {
+      await signOut(auth);
+      toast.success("Sessão encerrada com sucesso.");
+      navigate("/login");
+    } catch (error) {
+      toast.error("Erro ao sair da conta.");
+    }
+  };
+
+  const handleConectarTerapeuta = async (e) => {
+    e.preventDefault();
+    if (!codigoTerapeutaInput.trim()) return;
+
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const dadosTerapeuta = {
+        nome: `Dr(a). Especialista (${codigoTerapeutaInput.toUpperCase()})`,
+        codigo: codigoTerapeutaInput.toUpperCase(),
+        crp: "CRP 06/12345",
+        vinculadoEm: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, "usuarios", user.uid), { terapeuta: dadosTerapeuta }, { merge: true });
+      setTerapeutaVinculado(dadosTerapeuta);
+      setCodigoTerapeutaInput("");
+      toast.success("Terapeuta conectado com sucesso!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao conectar com terapeuta.");
+    }
+  };
+
+  const enviarMensagemChat = async (e) => {
+    e.preventDefault();
+    if (!novaMensagem.trim()) return;
+
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      await addDoc(collection(db, "usuarios", user.uid, "chatTerapeuta"), {
+        texto: novaMensagem.trim(),
+        remetente: "paciente",
+        data: new Date().toISOString()
+      });
+
+      setNovaMensagem("");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao enviar mensagem.");
+    }
+  };
+
+  const handleEnviarDocumento = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.doc,.docx,.png,.jpg";
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const user = auth.currentUser;
+        await addDoc(collection(db, "usuarios", user.uid, "chatTerapeuta"), {
+          texto: `[Documento anexado: ${file.name}]`,
+          remetente: "paciente",
+          documento: true,
+          data: new Date().toISOString()
+        });
+        toast.success("Documento enviado para o terapeuta!");
+      } catch (err) {
+        toast.error("Erro ao enviar documento.");
+      }
+    };
+    input.click();
+  };
 
   const handleFotoChange = (e) => {
     const file = e.target.files?.[0];
@@ -321,10 +443,10 @@ export default function Perfil() {
         nome: data.nome,
         email: data.email,
         fotoURL: urlFinal,
-        objetivoPrincipal: data.objetivoPrincipal,
-        generoMusical: data.generoMusical,
-        generoFilme: data.generoFilme,
-        momentoFavorito: data.momentoFavorito,
+        objetivos,
+        generosMusicais,
+        generosFilmes,
+        momentosFavoritos,
       }, { merge: true });
 
       setDadosOriginais({ nome: data.nome, email: data.email });
@@ -338,6 +460,39 @@ export default function Perfil() {
     } catch (error) {
       console.error(error);
       toast.error("Erro ao salvar alterações.");
+    }
+  };
+
+  const handleAlterarSenha = async (e) => {
+    e.preventDefault();
+    if (novaSenha.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (novaSenha !== confirmarSenha) {
+      toast.error("As senhas não coincidem.");
+      return;
+    }
+
+    setSalvandoSenha(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      await updatePassword(user, novaSenha);
+      toast.success("Senha alterada com sucesso!");
+      setModalSenha(false);
+      setNovaSenha("");
+      setConfirmarSenha("");
+    } catch (error) {
+      console.error(error);
+      if (error.code === "auth/requires-recent-login") {
+        toast.error("Por segurança, faça login novamente antes de alterar a senha.");
+      } else {
+        toast.error("Erro ao alterar senha. Tente novamente.");
+      }
+    } finally {
+      setSalvandoSenha(false);
     }
   };
 
@@ -378,7 +533,6 @@ export default function Perfil() {
     }
   };
 
-  // Função para simular o envio do formulário de ajuda
   const enviarMensagemAjuda = (e) => {
     e.preventDefault();
     if (!assuntoAjuda) {
@@ -387,7 +541,7 @@ export default function Perfil() {
     }
     toast.success("Mensagem enviada com sucesso! Retornaremos em breve.");
     setModalAjuda(false);
-    setAssuntoAjuda(""); // Limpa o formulário
+    setAssuntoAjuda(""); 
   };
 
   if (loading) {
@@ -405,7 +559,7 @@ export default function Perfil() {
   const proximoNivelXP = nivelAtual * 100;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff5f0_0%,_#fffbf9_38%,_#fffaf7_100%)] p-4 md:p-8 text-slate-800 antialiased font-sans pb-28 relative">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff5f0_0%,_#fffbf9_38%,_#fffaf7_100%)] p-4 md:p-8 text-slate-800 antialiased font-sans pb-32 relative">
       
       <AnimatePresence>
         {showSuccessBadge && (
@@ -423,29 +577,44 @@ export default function Perfil() {
 
       <div className="max-w-xl mx-auto space-y-6">
         
-        {/* TOPO */}
-        <div className="flex items-center justify-between">
-          <button onClick={() => navigate("/Menu")} className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-orange-500 transition-colors">
-            <ArrowLeft size={16} /> Painel Principal
-          </button>
+        {/* Topo com Botão de Sair (Log Out) e Abas */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <button onClick={() => navigate("/Menu")} className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-orange-500 transition-colors">
+              <ArrowLeft size={16} /> Painel Principal
+            </button>
+            <button 
+              onClick={handleLogOut}
+              className="flex items-center gap-1.5 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 border border-red-100 px-3 py-1.5 rounded-xl transition-all"
+              title="Sair da conta"
+            >
+              <LogOut size={14} /> Sair
+            </button>
+          </div>
 
-          <div className="flex gap-1 p-1 rounded-2xl bg-white/80 border border-slate-100 shadow-sm backdrop-blur">
+          <div className="flex gap-1 p-1 rounded-2xl bg-white/80 border border-slate-100 shadow-sm backdrop-blur w-full sm:w-auto justify-center">
             <button
               onClick={() => setAbaAtiva("perfil")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "perfil" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "perfil" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
             >
               Perfil
             </button>
             <button
               onClick={() => setAbaAtiva("amigos")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${abaAtiva === "amigos" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${abaAtiva === "amigos" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
             >
-              <Users size={14} /> Amigos
+              <Users size={13} /> Amigos
+            </button>
+            <button
+              onClick={() => setAbaAtiva("terapeuta")}
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${abaAtiva === "terapeuta" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+            >
+              <Stethoscope size={13} /> Terapeuta
             </button>
           </div>
         </div>
 
-        {/* HEADER DO PERFIL */}
+        {/* Header do Perfil */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -495,11 +664,10 @@ export default function Perfil() {
           </div>
         </motion.div>
 
-        {/* ==================== ABA PERFIL ==================== */}
+        {/* Aba Perfil */}
         {abaAtiva === "perfil" && (
           <div className="space-y-6">
             
-            {/* MINHA JORNADA */}
             <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
               <div className="flex items-center justify-between mb-5">
                 <div>
@@ -549,12 +717,13 @@ export default function Perfil() {
               </div>
             </div>
 
-            {/* DADOS PESSOAIS */}
             <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
-              <div className="mb-6">
-                <span className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.18em]">Seus dados</span>
-                <h2 className="text-lg font-black text-slate-800 mt-1">Informações pessoais</h2>
-                <p className="text-xs text-slate-400 mt-1">Clique no lápis para editar.</p>
+              <div className="mb-6 flex justify-between items-end">
+                <div>
+                  <span className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.18em]">Seus dados</span>
+                  <h2 className="text-lg font-black text-slate-800 mt-1">Informações pessoais</h2>
+                </div>
+                <span className="text-[9px] text-slate-400 font-bold uppercase">Múltipla escolha</span>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -574,56 +743,76 @@ export default function Perfil() {
                   </div>
                   <div>
                     <h3 className="text-sm font-black text-slate-800">Personalize sua experiência</h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Escolha o que combina com você.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Selecione uma ou mais opções.</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-[0.18em]">Foco da Jornada</label>
-                  <Controller name="objetivoPrincipal" control={control} render={({ field }) => (
-                    <CustomSelect {...field} placeholder="Qual é seu foco?" icon={Heart} options={[
+                  <CustomSelect 
+                    isMulti
+                    value={objetivos} 
+                    onChange={setObjetivos} 
+                    placeholder="Quais são seus focos?" 
+                    icon={Heart} 
+                    options={[
                       { value: "ansiedade", label: "Reduzir Ansiedade" }, { value: "estresse", label: "Lidar com Estresse" },
                       { value: "sono", label: "Dormir Melhor" }, { value: "autoestima", label: "Trabalhar Autoestima" },
                       { value: "autoconhecimento", label: "Autoconhecimento" }, { value: "habitos", label: "Criar Hábitos Saudáveis" },
                       { value: "humor", label: "Acompanhar meu Humor" }, { value: "foco", label: "Melhorar Foco" },
                       { value: "relaxamento", label: "Encontrar Relaxamento" },
-                    ]} />
-                  )} />
+                    ]} 
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-[0.18em]">Estilo de Música</label>
-                  <Controller name="generoMusical" control={control} render={({ field }) => (
-                    <CustomSelect {...field} placeholder="Qual é sua vibe?" icon={Music} options={[
+                  <CustomSelect 
+                    isMulti
+                    value={generosMusicais} 
+                    onChange={setGenerosMusicais} 
+                    placeholder="Quais suas vibes musicais?" 
+                    icon={Music} 
+                    options={[
                       { value: "lofi", label: "Lofi / Relaxante" }, { value: "instrumental", label: "Instrumental" },
                       { value: "classica", label: "Clássica" }, { value: "piano", label: "Piano / Soft" },
                       { value: "acustico", label: "Acústico" }, { value: "pop", label: "Pop / Vibrante" },
                       { value: "jazz", label: "Jazz / Soul" }, { value: "ambiente", label: "Ambient / Atmosférica" },
                       { value: "natureza", label: "Sons da Natureza" }, { value: "chuva", label: "Chuva / Sons de Água" },
-                    ]} />
-                  )} />
+                    ]} 
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-[0.18em]">Tipo de Filme</label>
-                  <Controller name="generoFilme" control={control} render={({ field }) => (
-                    <CustomSelect {...field} placeholder="O que você gosta de assistir?" icon={Film} options={[
+                  <CustomSelect 
+                    isMulti
+                    value={generosFilmes} 
+                    onChange={setGenerosFilmes} 
+                    placeholder="Tipos de filme favoritos?" 
+                    icon={Film} 
+                    options={[
                       { value: "comfort", label: "Comfort Movie" }, { value: "comedia", label: "Comédia / Leve" },
                       { value: "romance", label: "Romance" }, { value: "animacao", label: "Animação / Fantasia" },
                       { value: "aventura", label: "Aventura" }, { value: "motivacional", label: "Motivacional" },
                       { value: "documentario", label: "Documentários" }, { value: "drama", label: "Drama Leve" },
                       { value: "musical", label: "Musicais" }, { value: "nostalgico", label: "Nostálgico" },
-                    ]} />
-                  )} />
+                    ]} 
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-[0.18em]">Melhor Horário</label>
-                  <Controller name="momentoFavorito" control={control} render={({ field }) => (
-                    <CustomSelect {...field} placeholder="Quando você prefere?" icon={Clock3} options={[
+                  <CustomSelect 
+                    isMulti
+                    value={momentosFavoritos} 
+                    onChange={setMomentosFavoritos} 
+                    placeholder="Melhor horário de foco?" 
+                    icon={Clock3} 
+                    options={[
                       { value: "manha", label: "☀️ Manhã" }, { value: "tarde", label: "🌤️ Tarde" }, { value: "noite", label: "🌙 Noite" },
-                    ]} />
-                  )} />
+                    ]} 
+                  />
                 </div>
 
                 <button type="submit" className="w-full mt-7 py-4 rounded-2xl bg-gradient-to-r from-orange-400 to-[#E97451] hover:from-orange-500 hover:to-orange-500 text-white font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
@@ -632,7 +821,6 @@ export default function Perfil() {
               </form>
             </div>
 
-            {/* CONFIGURAÇÕES E AJUDA */}
             <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
               <div className="mb-5">
                 <span className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.18em]">Segurança</span>
@@ -643,6 +831,13 @@ export default function Perfil() {
                   <div className="flex items-center gap-3">
                     <div className="size-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><Bell size={17} className="text-slate-400" /></div>
                     <div className="text-left"><span className="block text-sm font-bold text-slate-700">Notificações e Horários</span><span className="text-[10px] text-slate-400">Personalize seus lembretes</span></div>
+                  </div>
+                  <ChevronRight size={16} className="text-slate-300" />
+                </button>
+                <button type="button" onClick={() => setModalSenha(true)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-100 hover:bg-orange-50 hover:border-orange-100 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><KeyRound size={17} className="text-slate-400" /></div>
+                    <div className="text-left"><span className="block text-sm font-bold text-slate-700">Alterar Senha</span><span className="text-[10px] text-slate-400">Atualize sua senha de acesso</span></div>
                   </div>
                   <ChevronRight size={16} className="text-slate-300" />
                 </button>
@@ -677,7 +872,7 @@ export default function Perfil() {
           </div>
         )}
 
-        {/* ==================== ABA AMIGOS ==================== */}
+        {/* Aba Amigos */}
         {abaAtiva === "amigos" && (
           <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
             <div className="mb-6">
@@ -725,19 +920,186 @@ export default function Perfil() {
             </div>
           </motion.div>
         )}
+
+        {/* Aba Terapeuta */}
+        {abaAtiva === "terapeuta" && (
+          <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white space-y-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.18em]">Acompanhamento Clínico</span>
+                <h2 className="text-xl font-black text-slate-800 mt-1">Seu Terapeuta</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Canal de comunicação seguro e confidencial.</p>
+              </div>
+              <div className="bg-blue-50 text-blue-600 p-2.5 rounded-2xl">
+                <Stethoscope size={20} />
+              </div>
+            </div>
+
+            {!terapeutaVinculado ? (
+              <div className="p-6 bg-slate-50 border border-slate-100 rounded-[2rem] text-center space-y-4">
+                <div className="size-12 bg-white rounded-2xl mx-auto flex items-center justify-center shadow-sm text-blue-500">
+                  <UserPlus size={22} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Nenhum terapeuta conectado</h3>
+                  <p className="text-[11px] text-slate-400 mt-1">Insira o código fornecido pelo seu profissional para liberar o chat e o envio de documentos.</p>
+                </div>
+
+                <form onSubmit={handleConectarTerapeuta} className="flex gap-2 max-w-sm mx-auto">
+                  <input 
+                    type="text" 
+                    placeholder="Ex: PSI-1234" 
+                    value={codigoTerapeutaInput}
+                    onChange={(e) => setCodigoTerapeutaInput(e.target.value)}
+                    className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-blue-200"
+                    required
+                  />
+                  <button type="submit" className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20">
+                    Conectar
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="size-11 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center shadow-md shadow-blue-500/20">
+                      👨‍⚕️
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800">{terapeutaVinculado.nome}</h3>
+                      <p className="text-[10px] text-blue-600 font-bold">{terapeutaVinculado.crp} • Vinculado</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      if (window.confirm("Deseja desconectar deste terapeuta?")) {
+                        setTerapeutaVinculado(null);
+                        setDoc(doc(db, "usuarios", auth.currentUser.uid), { terapeuta: null }, { merge: true });
+                        toast.success("Desconectado do terapeuta.");
+                      }
+                    }}
+                    className="text-[10px] font-bold text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all"
+                  >
+                    Desconectar
+                  </button>
+                </div>
+
+                <div className="border border-slate-100 rounded-2xl bg-slate-50/50 flex flex-col h-80">
+                  <div className="p-3 bg-white border-b border-slate-100 rounded-t-2xl flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <MessageSquare size={12} className="text-blue-500" /> Chat Direto e Seguro
+                    </span>
+                    <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">Criptografado</span>
+                  </div>
+
+                  <div className="flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar">
+                    {mensagensChat.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-xs">
+                        <p>Nenhuma mensagem ainda.</p>
+                        <p className="text-[10px] mt-0.5">Envie uma mensagem ou compartilhe documentos com seu terapeuta.</p>
+                      </div>
+                    ) : (
+                      mensagensChat.map(msg => (
+                        <div key={msg.id} className={`flex flex-col ${msg.remetente === "paciente" ? "items-end" : "items-start"}`}>
+                          <div className={`max-w-[80%] p-3 rounded-2xl text-xs font-medium leading-relaxed ${
+                            msg.remetente === "paciente" 
+                              ? "bg-blue-600 text-white rounded-br-none shadow-sm" 
+                              : "bg-white text-slate-700 border border-slate-200 rounded-bl-none shadow-sm"
+                          }`}>
+                            {msg.documento ? (
+                              <div className="flex items-center gap-2">
+                                <FileText size={16} />
+                                <span className="underline font-bold">{msg.texto}</span>
+                              </div>
+                            ) : (
+                              msg.texto
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <form onSubmit={enviarMensagemChat} className="p-3 bg-white border-t border-slate-100 rounded-b-2xl flex gap-2 items-center">
+                    <button 
+                      type="button" 
+                      onClick={handleEnviarDocumento}
+                      className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                      title="Enviar documento (PDF, Imagem)"
+                    >
+                      <Paperclip size={18} />
+                    </button>
+                    <input 
+                      type="text" 
+                      placeholder="Digite sua mensagem..." 
+                      value={novaMensagem}
+                      onChange={(e) => setNovaMensagem(e.target.value)}
+                      className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-200"
+                    />
+                    <button type="submit" className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-sm">
+                      <Send size={16} />
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
       </div>
 
-      {/* =========================================================
-         MODAIS / POP-UPS
-      ========================================================= */}
+      {/* Modais */}
       <AnimatePresence>
-        
-        {/* 1. Modal Notificações com Horários */}
+        {modalSenha && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-white w-full max-w-sm rounded-[2.5rem] p-7 shadow-2xl relative">
+              <button onClick={() => setModalSenha(false)} className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={16} /></button>
+              
+              <div className="size-12 rounded-2xl bg-orange-50 flex items-center justify-center mb-4"><KeyRound className="text-orange-500" size={24} /></div>
+              <h2 className="text-xl font-black text-slate-800">Alterar Senha</h2>
+              <p className="text-xs text-slate-500 mt-1 mb-5">Insira sua nova senha de acesso.</p>
+              
+              <form onSubmit={handleAlterarSenha} className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nova Senha</label>
+                  <input 
+                    type="password" 
+                    placeholder="Mínimo 6 caracteres" 
+                    value={novaSenha} 
+                    onChange={(e) => setNovaSenha(e.target.value)} 
+                    className="w-full mt-1 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-300"
+                    required 
+                    minLength={6} 
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Confirmar Nova Senha</label>
+                  <input 
+                    type="password" 
+                    placeholder="Repita a nova senha" 
+                    value={confirmarSenha} 
+                    onChange={(e) => setConfirmarSenha(e.target.value)} 
+                    className="w-full mt-1 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-300"
+                    required 
+                    minLength={6} 
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={salvandoSenha}
+                  className="w-full py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                  {salvandoSenha ? <Sparkles className="size-5 animate-spin" /> : <><Check size={16} /> Salvar Nova Senha</>}
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
         {modalNotificacoes && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative">
               <button onClick={() => setModalNotificacoes(false)} className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={16} /></button>
               
@@ -746,9 +1108,7 @@ export default function Perfil() {
               <p className="text-xs text-slate-500 mt-1 mb-5">Escolha os lembretes e o melhor horário.</p>
               
               <div className="space-y-4">
-                
-                {/* Lembrete de Meditação */}
-                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl transition-all">
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="block text-sm font-bold text-slate-700">Lembrete de Meditação</span>
@@ -756,25 +1116,15 @@ export default function Perfil() {
                     </div>
                     <ToggleSwitch checked={notifMeditacao} onChange={() => setNotifMeditacao(!notifMeditacao)} />
                   </div>
-                  <AnimatePresence>
-                    {notifMeditacao && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                        <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-500">Horário do aviso:</span>
-                          <input 
-                            type="time" 
-                            value={horarioMeditacao}
-                            onChange={(e) => setHorarioMeditacao(e.target.value)}
-                            className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-orange-500 outline-none focus:ring-2 focus:ring-orange-300"
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {notifMeditacao && (
+                    <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500">Horário:</span>
+                      <input type="time" value={horarioMeditacao} onChange={(e) => setHorarioMeditacao(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-orange-500 outline-none" />
+                    </div>
+                  )}
                 </div>
 
-                {/* Check-in de Humor */}
-                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl transition-all">
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="block text-sm font-bold text-slate-700">Check-in de Humor</span>
@@ -782,47 +1132,33 @@ export default function Perfil() {
                     </div>
                     <ToggleSwitch checked={notifDiario} onChange={() => setNotifDiario(!notifDiario)} />
                   </div>
-                  <AnimatePresence>
-                    {notifDiario && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                        <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-500">Horário do aviso:</span>
-                          <input 
-                            type="time" 
-                            value={horarioDiario}
-                            onChange={(e) => setHorarioDiario(e.target.value)}
-                            className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-orange-500 outline-none focus:ring-2 focus:ring-orange-300"
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {notifDiario && (
+                    <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500">Horário:</span>
+                      <input type="time" value={horarioDiario} onChange={(e) => setHorarioDiario(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-orange-500 outline-none" />
+                    </div>
+                  )}
                 </div>
-
               </div>
             </motion.div>
           </motion.div>
         )}
 
-        {/* 2. Modal Privacidade (LGPD) */}
         {modalPrivacidade && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-white w-full max-w-sm rounded-[2.5rem] p-7 shadow-2xl relative">
               <button onClick={() => setModalPrivacidade(false)} className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={16} /></button>
               
               <div className="size-12 rounded-2xl bg-emerald-50 flex items-center justify-center mb-4"><ShieldCheck className="text-emerald-500" size={24} /></div>
               <h2 className="text-xl font-black text-slate-800">Privacidade e LGPD</h2>
               <p className="text-xs text-slate-500 mt-1 mb-5 leading-relaxed">
-                O MindQuest segue rigorosamente as diretrizes da <strong>Lei Geral de Proteção de Dados (LGPD)</strong>. Seus dados de humor, diários e preferências são criptografados e estritamente confidenciais.
+                O MindQuest segue rigorosamente as diretrizes da <strong>Lei Geral de Proteção de Dados (LGPD)</strong>. Seus dados de humor e preferências são criptografados.
               </p>
               
               <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-center justify-between gap-3">
                 <div className="text-left">
                   <span className="block text-xs font-bold text-orange-700">Compartilhar com Psicólogo</span>
-                  <span className="block text-[9px] text-orange-500/80 mt-1 leading-tight">Ao ativar, relatórios anônimos de humor poderão ser acessados pelo seu profissional de saúde vinculado.</span>
+                  <span className="block text-[9px] text-orange-500/80 mt-1 leading-tight">Relatórios anônimos de humor acessíveis pelo profissional vinculado.</span>
                 </div>
                 <ToggleSwitch checked={compartilharPsicologo} onChange={() => setCompartilharPsicologo(!compartilharPsicologo)} />
               </div>
@@ -830,22 +1166,16 @@ export default function Perfil() {
           </motion.div>
         )}
 
-        {/* 3. Modal Central de Ajuda com o CustomSelect */}
         {modalAjuda && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-white w-full max-w-md rounded-[2.5rem] p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto">
               <button onClick={() => setModalAjuda(false)} className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={16} /></button>
               
               <div className="size-12 rounded-2xl bg-orange-50 flex items-center justify-center mb-4"><HelpCircle className="text-orange-500" size={24} /></div>
               <h2 className="text-xl font-black text-slate-800">Central de Ajuda</h2>
-              <p className="text-xs text-slate-500 mt-1 mb-6">Envie um e-mail para nossa equipe com sua mensagem.</p>
+              <p className="text-xs text-slate-500 mt-1 mb-6">Envie uma mensagem para nossa equipe.</p>
               
               <form onSubmit={enviarMensagemAjuda} className="space-y-4">
-                
-                {/* AQUI ESTÁ O CUSTOM SELECT CORRIGIDO */}
                 <div className="relative z-50">
                   <CustomSelect 
                     value={assuntoAjuda}
@@ -861,12 +1191,7 @@ export default function Perfil() {
                   />
                 </div>
                 
-                <textarea 
-                  rows="3" 
-                  placeholder="Escreva sua mensagem aqui..." 
-                  required
-                  className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 text-sm outline-none focus:ring-2 focus:ring-orange-300 resize-none text-slate-700 placeholder:text-slate-400 relative z-10"
-                ></textarea>
+                <textarea rows="3" placeholder="Escreva sua mensagem aqui..." required className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 text-sm outline-none focus:ring-2 focus:ring-orange-300 resize-none text-slate-700 relative z-10" />
 
                 <button type="submit" className="w-full py-3.5 rounded-2xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors relative z-10">
                   <Send size={16} /> Enviar Mensagem
@@ -875,7 +1200,6 @@ export default function Perfil() {
 
               <div className="h-px bg-slate-100 my-6 relative z-10" />
 
-              {/* Acessibilidade */}
               <div className="relative z-10">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inclusão</span>
                 <div className="mt-2 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
@@ -883,17 +1207,17 @@ export default function Perfil() {
                   <div>
                     <h4 className="text-sm font-bold text-blue-900">Apoio à Acessibilidade</h4>
                     <p className="text-[10px] text-blue-700/80 mt-1 leading-relaxed">
-                      Se você é uma pessoa com deficiência e precisa de suporte especializado, leitor de tela ou ajustes de contraste, entre em contato pelo e-mail: <strong>acessibilidade@mindquest.com</strong>
+                      Suporte especializado pelo e-mail: <strong>acessibilidade@mindquest.com</strong>
                     </p>
                   </div>
                 </div>
               </div>
-
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      <BottomNav />
     </div>
   );
 }
