@@ -82,7 +82,7 @@ export default function LoginPsicologo() {
         {/* Topo: Voltar */}
         <div className="flex items-center justify-between">
           <button 
-            onClick={() => navigate("/")} 
+            onClick={() => navigate("/home")} 
             className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-peach-500 transition-colors"
           >
             <ArrowLeft size={16} /> Voltar ao Início
