@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Toaster } from "sonner"; // IMPORTANTE AQUI
+import { Toaster } from "sonner"; 
 import Home from "./pages/Home";
 import Cadastro from "./pages/Cadastro";
 import Login from "./pages/Login";
@@ -12,6 +12,12 @@ import Meditacao from "./pages/Meditacao";
 import Conquistas from "./pages/Conquistas";
 import Loja from "./pages/Loja";
 import GerenciarAtividades from "./pages/GerenciarAtividades";
+import PerfilPsicologo from "./pages/PerfilPsicologo";
+import CadastroDeServico from "./pages/CadastroDeServico"; 
+import AvaliacoesPsicologo from "./pages/AvaliacoesPsicologo"; 
+import LoginPsicologo from "./pages/LoginPsicologo";
+import HistoricoPaciente from "./pages/HistoricoPaciente";
+
 
 function App() {
   return (
@@ -19,7 +25,8 @@ function App() {
       <Toaster position="top-center" richColors theme="light" /> 
       
       <Routes>
-        <Route path="/" element={<Home />} />
+           {/* ROTAS DO PACIENTE */}
+        <Route path="/home" element={<Home />} />
         <Route path="/cadastro" element={<Cadastro />} />
         <Route path="/login" element={<Login />} />
         <Route path="/humor" element={<Humor />} />
@@ -31,6 +38,14 @@ function App() {
         <Route path="/conquistas" element={<Conquistas />} />
         <Route path="/loja" element={<Loja />} />
         <Route path="/atividades" element={<GerenciarAtividades />} />
+        
+        {/* ROTAS DO PSICÓLOGO */}
+        <Route path="/painel-psicologo" element={<PerfilPsicologo />} />
+        <Route path="/CadastroDeServico" element={<CadastroDeServico />} />
+        <Route path="/AvaliacoesPsicologo" element={<AvaliacoesPsicologo />} />
+        <Route path="/login-psicologo" element={<LoginPsicologo />} />
+        <Route path="/HistoricoPaciente" element={<HistoricoPaciente />} />
+
       </Routes>
     </Router>
   );

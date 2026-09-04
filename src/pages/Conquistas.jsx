@@ -5,9 +5,6 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
-/* =========================================================
-   DADOS SIMULADOS DAS CONQUISTAS (BADGES)
-========================================================= */
 const conquistas = [
   {
     id: 1,
