@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  ArrowLeft, ShieldCheck, Mail, Lock, User, 
-  BriefcaseMedical, Sparkles, LogIn, UserPlus 
+  ArrowLeft, ShieldCheck, Mail, Lock, User, Sparkles, LogIn, UserPlus 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
@@ -48,7 +47,7 @@ export default function LoginPsicologo() {
           crp,
           email,
           especialidade: "Psicologia Clínica",
-          bio: "Olá! Sou profissional cadastrado no MindQuest Pro.",
+          bio: "Olá! Sou profissional cadastrado no MindQuest.",
           criadoEm: new Date().toISOString()
         });
 
@@ -85,13 +84,10 @@ export default function LoginPsicologo() {
             onClick={() => navigate("/home")} 
             className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-peach-500 transition-colors"
           >
-            <ArrowLeft size={16} /> Voltar ao Início
+            <ArrowLeft size={16} /> Voltar para a Tela Inicial
           </button>
           
-          <div className="flex items-center gap-1.5 bg-white/80 border border-peach-100 px-3 py-1.5 rounded-full shadow-sm backdrop-blur">
-            <ShieldCheck size={14} className="text-emerald-500" />
-            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">MindQuest Pro</span>
-          </div>
+
         </div>
 
         {/* Container do Formulário */}
@@ -108,7 +104,7 @@ export default function LoginPsicologo() {
               <img src={logoReduzido} alt="MindQuest Logo" className="w-8 h-8 object-contain" />
             </div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              {isLogin ? "Acesso Profissional" : "Cadastro Pro"}
+              {isLogin ? "Acesso Profissional" : "Cadastro"}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
               {isLogin ? "Entre com sua conta para gerenciar pacientes." : "Cadastre-se para começar a atender no MindQuest."}

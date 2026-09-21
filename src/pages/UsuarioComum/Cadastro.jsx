@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, Mail, Lock, User, 
-  Sparkles, ChevronRight, Heart, 
-  Music, Film, Clock3, CheckSquare, 
-  Square, ShieldCheck, Check, Info
+  Sparkles, ChevronRight, CheckSquare, 
+  Square, ShieldCheck, Check, Calendar, Users,
+  Eye, EyeOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
@@ -13,83 +13,96 @@ import { doc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import logoReduzido from "../../assets/LogoPessegoReduzido.png";
 
-// Componente CustomSelect com Múltipla Escolha
-function CustomSelect({ value, onChange, placeholder, options, icon: Icon, isMulti = false }) {
+
+function validarDataNascimento(dataStr) {
+  // 1. Verifica se está no formato DD/MM/AAAA completo
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) {
+    return { valido: false, mensagem: "Data de nascimento incompleta." };
+  }
+
+  const [diaStr, mesStr, anoStr] = dataStr.split("/");
+  const dia = parseInt(diaStr, 10);
+  const mes = parseInt(mesStr, 10);
+  const ano = parseInt(anoStr, 10);
+
+  // 2. Valida limites básicos de mês e ano
+  const anoAtual = new Date().getFullYear();
+  if (mes < 1 || mes > 12) {
+    return { valido: false, mensagem: "Mês inválido." };
+  }
+  if (ano < anoAtual - 120 || ano > anoAtual) {
+    return { valido: false, mensagem: "Ano de nascimento inválido." };
+  }
+
+  // 3. Valida se o dia existe dentro daquele mês (trata anos bissextos e meses com 30/31 dias)
+  const data = new Date(ano, mes - 1, dia);
+  if (
+    data.getFullYear() !== ano ||
+    data.getMonth() !== mes - 1 ||
+    data.getDate() !== dia
+  ) {
+    return { valido: false, mensagem: "Dia inválido para o mês informado." };
+  }
+
+  // 4. Não permite data no futuro
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  if (data > hoje) {
+    return { valido: false, mensagem: "A data de nascimento não pode estar no futuro." };
+  }
+
+  return { valido: true };
+}
+
+// Componente CustomSelect
+function CustomSelect({ value, onChange, placeholder, options, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(false);
-
-  const handleSelect = (optionValue) => {
-    if (isMulti) {
-      if (value.includes(optionValue)) {
-        onChange(value.filter((v) => v !== optionValue));
-      } else {
-        onChange([...value, optionValue]);
-      }
-    } else {
-      onChange(optionValue);
-      setIsOpen(false);
-    }
-  };
-
-  const getDisplayLabel = () => {
-    if (isMulti) {
-      if (!value || value.length === 0) return placeholder;
-      if (value.length === 1) return options.find((o) => o.value === value[0])?.label;
-      return `${value.length} opções selecionadas`;
-    } else {
-      const selectedOption = options.find((o) => o.value === value);
-      return selectedOption ? selectedOption.label : placeholder;
-    }
-  };
-
-  const temSelecao = isMulti ? value.length > 0 : !!value;
+  const opcaoSelecionada = options.find((o) => o.value === value);
 
   return (
     <div className="relative w-full text-left">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`relative w-full flex items-center justify-between pl-11 pr-4 py-3.5 rounded-2xl border bg-slate-50 hover:bg-white transition-all duration-200 outline-none ${
-          isOpen ? "border-peach-300 bg-white shadow-md ring-4 ring-peach-400/10" : "border-slate-100"
+        className={`relative w-full flex items-center justify-between pl-11 pr-4 py-3.5 rounded-2xl border bg-slate-50 transition-all outline-none cursor-pointer ${
+          isOpen 
+            ? "border-orange-300 bg-white ring-4 ring-orange-400/10 shadow-md" 
+            : "border-slate-100 hover:bg-white"
         }`}
       >
         {Icon && (
-          <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 size-4 ${temSelecao ? "text-peach-500" : "text-slate-400"}`} />
+          <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 size-4 transition-colors ${
+            value ? "text-[#E97451]" : "text-slate-400"
+          }`} />
         )}
-        <span className={`text-sm text-left truncate pr-2 ${temSelecao ? "text-slate-700 font-semibold" : "text-slate-400"}`}>
-          {getDisplayLabel()}
+        <span className={`text-sm truncate pr-2 ${value ? "text-slate-700 font-semibold" : "text-slate-400"}`}>
+          {opcaoSelecionada ? opcaoSelecionada.label : placeholder}
         </span>
         <ChevronRight className={`size-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -5, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -5, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="absolute z-50 mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-900/10 overflow-hidden p-1.5 max-h-56 overflow-y-auto custom-scrollbar"
-          >
-            {options.map((option) => {
-              const isSelected = isMulti ? value.includes(option.value) : value === option.value;
-              
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleSelect(option.value)}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm transition-all ${
-                    isSelected ? "bg-peach-50 text-peach-600 font-semibold" : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span>{option.label}</span>
-                  {isSelected && isMulti && <Check size={14} className="text-peach-500" />}
-                </button>
-              );
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isOpen && (
+        <div className="absolute z-50 mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-900/10 p-1.5 max-h-56 overflow-y-auto">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm transition-all cursor-pointer ${
+                value === option.value 
+                  ? "bg-orange-50 text-[#E97451] font-semibold" 
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <span>{option.label}</span>
+              {value === option.value && <Check size={14} className="text-[#E97451]" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -97,29 +110,56 @@ function CustomSelect({ value, onChange, placeholder, options, icon: Icon, isMul
 export default function Cadastro() {
   const navigate = useNavigate();
   
+  // Dados Básicos
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [confirmarEmail, setConfirmarEmail] = useState("");
   const [senha, setSenha] = useState("");
-  
-  // Todos os campos de personalização agora suportam múltiplas escolhas (Arrays)
-  const [objetivoPrincipal, setObjetivoPrincipal] = useState([]);
-  const [generoMusical, setGeneroMusical] = useState([]);
-  const [generoFilme, setGeneroFilme] = useState([]);
-  const [momentoFavorito, setMomentoFavorito] = useState([]);
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [genero, setGenero] = useState("");
+
+  // Visibilidade das senhas
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
 
   const [termosAceitos, setTermosAceitos] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const opcoesGenero = [
+    { value: "feminino", label: "Feminino" },
+    { value: "masculino", label: "Masculino" },
+    { value: "nao_binario", label: "Não-binário" },
+    { value: "outro", label: "Outro" },
+    { value: "prefiro_nao_informar", label: "Prefiro não informar" }
+  ];
+
   const handleCadastro = async (e) => {
     e.preventDefault();
     
-    if (!nome || !email || !senha) {
-      toast.error("Por favor, preencha todos os dados básicos.");
+    if (!nome || !email || !confirmarEmail || !senha || !confirmarSenha || !dataNascimento || !genero) {
+      toast.error("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
 
-    if (objetivoPrincipal.length === 0 || generoMusical.length === 0 || generoFilme.length === 0 || momentoFavorito.length === 0) {
-      toast.error("Por favor, selecione pelo menos uma opção em cada pergunta do questionário.");
+    if (email.trim().toLowerCase() !== confirmarEmail.trim().toLowerCase()) {
+      toast.error("Os e-mails informados não coincidem.");
+      return;
+    }
+
+    if (senha !== confirmarSenha) {
+      toast.error("As senhas informadas não coincidem.");
+      return;
+    }
+
+    const validacaoData = validarDataNascimento(dataNascimento);
+    if (!validacaoData.valido) {
+      toast.error(validacaoData.mensagem);
+      return;
+    }
+
+    if (senha.length < 6) {
+      toast.error("A senha deve ter no mínimo 6 caracteres.");
       return;
     }
 
@@ -139,14 +179,13 @@ export default function Cadastro() {
       await setDoc(doc(db, "usuarios", user.uid), {
         nome,
         email,
+        dataNascimento,
+        genero,
         xp: 0,
         nivel: 1,
+        moedas: 0,
         criadoEm: new Date().toISOString(),
-        tipo: "paciente",
-        objetivos: objetivoPrincipal,
-        generosMusicais: generoMusical,
-        generosFilmes: generoFilme,
-        momentosFavoritos: momentoFavorito
+        tipoPerfil: "usuario"
       });
 
       toast.success("Conta criada com sucesso! Bem-vindo ao MindQuest.");
@@ -169,25 +208,25 @@ export default function Cadastro() {
   return (
     <div className="min-h-screen bg-[#FFFBF9] flex flex-col justify-center items-center p-4 md:p-8 antialiased font-sans text-slate-800 relative overflow-hidden">
       
-      <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-peach-200/40 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-72 h-72 bg-orange-200/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-orange-200/40 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-72 h-72 bg-amber-200/30 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-2xl space-y-6 relative z-10 my-8">
         
         <button 
-          onClick={() => navigate("/login")} 
-          className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-peach-500 transition-colors"
+          onClick={() => navigate("/Home")} 
+          className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#E97451] transition-colors cursor-pointer"
         >
-          <ArrowLeft size={16} /> Voltar para o Login
+          <ArrowLeft size={16} /> Voltar para a Tela Inicial
         </button>
 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-[2.5rem] shadow-xl border border-peach-50 p-6 md:p-10"
+          className="bg-white rounded-[2.5rem] shadow-xl border border-orange-50 p-6 md:p-10"
         >
           <div className="text-center mb-8">
-            <div className="bg-peach-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-peach-100 shadow-sm">
+            <div className="bg-orange-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-orange-100 shadow-sm">
               <img src={logoReduzido} alt="MindQuest Logo" className="w-10 h-10 object-contain" />
             </div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Criar Conta</h1>
@@ -196,23 +235,27 @@ export default function Cadastro() {
 
           <form onSubmit={handleCadastro} className="space-y-6">
             
-            {/* Sessão 1 */}
+            {/* Seção de Dados Básicos */}
             <div className="space-y-4">
-              <h2 className="text-[10px] font-bold text-peach-500 uppercase tracking-widest border-b border-slate-100 pb-2">1. Seus Dados Básicos</h2>
+              <h2 className="text-[10px] font-bold text-[#E97451] uppercase tracking-widest border-b border-slate-100 pb-2">
+                1. Seus Dados Básicos
+              </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative">
+                {/* Nome Completo */}
+                <div className="relative md:col-span-2">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                   <input 
                     type="text" 
                     placeholder="Seu nome completo" 
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-peach-200 transition-all text-slate-700"
+                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-all text-slate-700"
                     required
                   />
                 </div>
 
+                {/* E-mail */}
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                   <input 
@@ -220,99 +263,103 @@ export default function Cadastro() {
                     placeholder="Seu melhor e-mail" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-peach-200 transition-all text-slate-700"
+                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-all text-slate-700"
                     required
                   />
                 </div>
 
-                <div className="relative md:col-span-2">
+                {/* Confirmar E-mail */}
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                  <input 
+                    type="email" 
+                    placeholder="Confirme seu e-mail" 
+                    value={confirmarEmail}
+                    onChange={(e) => setConfirmarEmail(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-all text-slate-700"
+                    required
+                  />
+                </div>
+
+                {/* Senha */}
+                <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                   <input 
-                    type="password" 
+                    type={mostrarSenha ? "text" : "password"} 
                     placeholder="Crie uma senha (mínimo 6 caracteres)" 
                     value={senha}
                     onChange={(e) => setSenha(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-peach-200 transition-all text-slate-700"
+                    className="w-full pl-11 pr-11 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-all text-slate-700"
                     required
                     minLength={6}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarSenha((prev) => !prev)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 hover:-translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transform-none sm:transform transition-colors"
+                    style={{ transform: "translateY(-50%)" }}
+                  >
+                    {mostrarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-              </div>
-            </div>
 
-            {/* Sessão 2 */}
-            <div className="space-y-4 pt-2">
-              <div className="border-b border-slate-100 pb-3">
-                <h2 className="text-[10px] font-bold text-peach-500 uppercase tracking-widest">2. Personalize sua Experiência</h2>
-                <div className="flex items-center gap-1.5 mt-2 bg-peach-50 text-peach-700 px-3 py-1.5 rounded-lg w-fit">
-                  <Info size={14} className="text-peach-500" />
-                  <span className="text-xs font-bold">Você pode selecionar mais de uma opção em cada categoria!</span>
+                {/* Confirmar Senha */}
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                  <input 
+                    type={mostrarConfirmarSenha ? "text" : "password"} 
+                    placeholder="Confirme sua senha" 
+                    value={confirmarSenha}
+                    onChange={(e) => setConfirmarSenha(e.target.value)}
+                    className="w-full pl-11 pr-11 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-all text-slate-700"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarConfirmarSenha((prev) => !prev)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 hover:-translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transform-none sm:transform transition-colors"
+                    style={{ transform: "translateY(-50%)" }}
+                  >
+                    {mostrarConfirmarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="z-40">
-                  <CustomSelect 
-                    isMulti
-                    value={objetivoPrincipal} 
-                    onChange={setObjetivoPrincipal} 
-                    placeholder="Quais são seus focos?" 
-                    icon={Heart} 
-                    options={[
-                      { value: "ansiedade", label: "Reduzir Ansiedade" }, { value: "estresse", label: "Lidar com Estresse" },
-                      { value: "sono", label: "Dormir Melhor" }, { value: "autoestima", label: "Trabalhar Autoestima" },
-                      { value: "autoconhecimento", label: "Autoconhecimento" }, { value: "habitos", label: "Criar Hábitos Saudáveis" },
-                    ]} 
+
+                {/* Data de Nascimento */}
+                <div className="relative">
+                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    placeholder="Data de nascimento (DD/MM/AAAA)" 
+                    maxLength={10}
+                    value={dataNascimento}
+                    onChange={(e) => {
+                      let valor = e.target.value.replace(/\D/g, ""); // Permite só números
+                      if (valor.length > 2) valor = valor.replace(/^(\d{2})(\d)/, "$1/$2");
+                      if (valor.length > 4) valor = valor.replace(/^(\d{2})\/(\d{2})(\d)/, "$1/$2/$3");
+                      setDataNascimento(valor);
+                    }}
+                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-all text-slate-700 placeholder:text-slate-400"
+                    required
                   />
                 </div>
 
-                <div className="z-30">
+                {/* Gênero */}
+                <div>
                   <CustomSelect 
-                    isMulti
-                    value={generoMusical} 
-                    onChange={setGeneroMusical} 
-                    placeholder="Quais suas vibes musicais?" 
-                    icon={Music} 
-                    options={[
-                      { value: "lofi", label: "Lofi / Relaxante" }, { value: "instrumental", label: "Instrumental" },
-                      { value: "classica", label: "Clássica" }, { value: "pop", label: "Pop / Vibrante" },
-                      { value: "natureza", label: "Sons da Natureza" },
-                    ]} 
-                  />
-                </div>
-
-                <div className="z-20">
-                  <CustomSelect 
-                    isMulti
-                    value={generoFilme} 
-                    onChange={setGeneroFilme} 
-                    placeholder="Tipos de filme favoritos?" 
-                    icon={Film} 
-                    options={[
-                      { value: "comfort", label: "Comfort Movie" }, { value: "comedia", label: "Comédia / Leve" },
-                      { value: "romance", label: "Romance" }, { value: "animacao", label: "Animação / Fantasia" },
-                      { value: "documentario", label: "Documentários" }, { value: "ficcao", label: "Ficção Científica" }
-                    ]} 
-                  />
-                </div>
-
-                <div className="z-10">
-                  <CustomSelect 
-                    isMulti
-                    value={momentoFavorito} 
-                    onChange={setMomentoFavorito} 
-                    placeholder="Melhor horário de foco?" 
-                    icon={Clock3} 
-                    options={[
-                      { value: "manha", label: "☀️ Manhã" }, { value: "tarde", label: "🌤️ Tarde" }, { value: "noite", label: "🌙 Noite" },
-                    ]} 
+                    value={genero}
+                    onChange={setGenero}
+                    placeholder="Selecione seu gênero"
+                    options={opcoesGenero}
+                    icon={Users}
                   />
                 </div>
               </div>
             </div>
 
-            {/* Sessão 3 */}
-            <div className="pt-4 pb-2">
+            {/* Termos de Consentimento e LGPD */}
+            <div className="pt-2 pb-2">
               <div className="flex flex-col gap-3 w-full p-5 rounded-3xl bg-slate-50 border border-slate-200 shadow-inner">
                 <div className="flex items-center gap-2 mb-1">
                   <ShieldCheck size={18} className="text-emerald-500" />
@@ -339,7 +386,7 @@ export default function Cadastro() {
                     <button 
                       type="button"
                       onClick={() => setTermosAceitos(!termosAceitos)}
-                      className="shrink-0 outline-none transition-transform active:scale-90"
+                      className="shrink-0 outline-none transition-transform active:scale-90 cursor-pointer"
                     >
                       {termosAceitos ? (
                         <CheckSquare className="size-6 text-emerald-500" />
@@ -355,10 +402,11 @@ export default function Cadastro() {
               </div>
             </div>
 
+            {/* Botão de Submissão */}
             <button 
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-[#E97451] hover:bg-[#C06043] text-white rounded-2xl font-bold text-sm shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:active:scale-100"
+              className="w-full py-4 bg-[#E97451] hover:bg-[#C06043] text-white rounded-2xl font-bold text-sm shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:active:scale-100 cursor-pointer"
             >
               {loading ? (
                 <Sparkles className="size-5 animate-spin" />
@@ -375,7 +423,7 @@ export default function Cadastro() {
           Já tem uma conta?{" "}
           <button 
             onClick={() => navigate("/login")}
-            className="text-[#E97451] font-bold hover:underline"
+            className="text-[#E97451] font-bold hover:underline cursor-pointer"
           >
             Fazer login
           </button>
