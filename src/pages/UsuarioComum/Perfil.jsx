@@ -1,20 +1,21 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  User, Mail, Heart, Film, Music, Sparkles, ArrowLeft, Save,
+  User, Mail, Sparkles, ArrowLeft, Save,
   CheckCircle2, Camera, Users, UserPlus, Trash2, Flame, Award,
   Bell, Lock, HelpCircle, ChevronRight, Pencil, KeyRound,
-  Check, X, Clock3, Headphones, Smile, Send, Accessibility, ShieldCheck,
-  Stethoscope, MessageSquare, Paperclip, FileText, LogOut, Info
+  Check, X, Headphones, Smile, Send, Accessibility, ShieldCheck,
+  Stethoscope, MessageSquare, Paperclip, FileText, LogOut
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
 import { auth, db } from "../../firebaseConfig";
-import { onAuthStateChanged, updateEmail, updatePassword, signOut } from "firebase/auth";
+import { onAuthStateChanged, updateEmail, updatePassword, signOut, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc, query, orderBy, onSnapshot } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
 import { toast } from "sonner";
 import BottomNav from "../../components/BottomNav";
 
@@ -196,6 +197,8 @@ export default function Perfil() {
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
   const [userXP, setUserXP] = useState(0);
 
+  // Estados de Salvamento do Perfil
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [editandoNome, setEditandoNome] = useState(false);
   const [editandoEmail, setEditandoEmail] = useState(false);
   
@@ -206,12 +209,6 @@ export default function Perfil() {
   const [listaAmigos, setListaAmigos] = useState([]);
   
   const [dadosOriginais, setDadosOriginais] = useState({ nome: "", email: "" });
-
-  // Estados dos Selects Múltiplos
-  const [objetivos, setObjetivos] = useState([]);
-  const [generosMusicais, setGenerosMusicais] = useState([]);
-  const [generosFilmes, setGenerosFilmes] = useState([]);
-  const [momentosFavoritos, setMomentosFavoritos] = useState([]);
 
   // Estados do Terapeuta e Chat
   const [terapeutaVinculado, setTerapeutaVinculado] = useState(null);
@@ -225,10 +222,13 @@ export default function Perfil() {
   const [modalAjuda, setModalAjuda] = useState(false);
   const [modalSenha, setModalSenha] = useState(false);
 
+  // Estados de Alteração de Senha
+  const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [salvandoSenha, setSalvandoSenha] = useState(false);
 
+  // Configurações e Notificações
   const [notifMeditacao, setNotifMeditacao] = useState(true);
   const [horarioMeditacao, setHorarioMeditacao] = useState("08:00"); 
   const [notifDiario, setNotifDiario] = useState(true);
@@ -236,10 +236,11 @@ export default function Perfil() {
   const [compartilharPsicologo, setCompartilharPsicologo] = useState(false);
   const [assuntoAjuda, setAssuntoAjuda] = useState("");
 
-  const { register, handleSubmit, control, reset, setValue, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      nome: "", email: "",
+      nome: "", 
+      email: "",
     },
   });
 
@@ -263,13 +264,6 @@ export default function Perfil() {
           emailAtual = dados.email || user.email || "";
           setUserXP(dados.xp || 0);
           if (dados.fotoURL) setFotoURL(dados.fotoURL);
-
-          // Tratamento para suportar tanto array novo quanto string antiga
-          setObjetivos(dados.objetivos || (dados.objetivoPrincipal ? [dados.objetivoPrincipal] : []));
-          setGenerosMusicais(dados.generosMusicais || (dados.generoMusical ? [dados.generoMusical] : []));
-          setGenerosFilmes(dados.generosFilmes || (dados.generoFilme ? [dados.generoFilme] : []));
-          setMomentosFavoritos(dados.momentosFavoritos || (dados.momentoFavorito ? [dados.momentoFavorito] : []));
-
           if (dados.terapeuta) setTerapeutaVinculado(dados.terapeuta);
         }
 
@@ -305,7 +299,7 @@ export default function Perfil() {
     const q = query(chatRef, orderBy("data", "asc"));
 
     const unsubscribeChat = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const msgs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
       setMensagensChat(msgs);
     });
 
@@ -419,37 +413,36 @@ export default function Perfil() {
     try {
       const user = auth.currentUser;
       if (!user) return;
-      
-      let urlFinal = fotoURL;
 
-      if (arquivoFoto) {
-        const storage = getStorage();
-        const imageRef = ref(storage, `perfil/${user.uid}`);
-        await uploadBytes(imageRef, arquivoFoto);
-        urlFinal = await getDownloadURL(imageRef);
-      }
+      setSalvandoPerfil(true);
 
-      if (data.email !== user.email) {
+      // Atualiza o e-mail no Authentication caso tenha mudado
+      if (data.email.trim() !== user.email) {
         try {
-          await updateEmail(user, data.email);
-        } catch (error) {
-          toast.error("Para alterar o e-mail, faça login novamente antes de tentar.");
-          return;
+          await updateEmail(user, data.email.trim());
+        } catch (authErr) {
+          if (authErr.code === "auth/requires-recent-login") {
+            toast.error("Por segurança, saia e entre novamente para alterar o e-mail.");
+            setSalvandoPerfil(false);
+            return;
+          }
+          throw authErr;
         }
       }
 
+      // Grava diretamente no Firestore (usando o Base64 já guardado em fotoURL)
       const userDocRef = doc(db, "usuarios", user.uid);
       await setDoc(userDocRef, {
-        nome: data.nome,
-        email: data.email,
-        fotoURL: urlFinal,
-        objetivos,
-        generosMusicais,
-        generosFilmes,
-        momentosFavoritos,
+        nome: data.nome.trim(),
+        email: data.email.trim(),
+        fotoURL: fotoURL || "",
+        atualizadoEm: new Date().toISOString()
       }, { merge: true });
 
-      setDadosOriginais({ nome: data.nome, email: data.email });
+      setDadosOriginais({ 
+        nome: data.nome.trim(), 
+        email: data.email.trim() 
+      });
       setEditandoNome(false);
       setEditandoEmail(false);
       setArquivoFoto(null);
@@ -458,38 +451,58 @@ export default function Perfil() {
       setTimeout(() => setShowSuccessBadge(false), 3000);
       toast.success("Perfil atualizado com sucesso!");
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao salvar perfil:", error);
       toast.error("Erro ao salvar alterações.");
+    } finally {
+      setSalvandoPerfil(false);
     }
   };
 
   const handleAlterarSenha = async (e) => {
     e.preventDefault();
+
+    if (!senhaAtual) {
+      toast.error("Por favor, digite sua senha atual.");
+      return;
+    }
     if (novaSenha.length < 6) {
-      toast.error("A senha deve ter pelo menos 6 caracteres.");
+      toast.error("A nova senha deve ter pelo menos 6 caracteres.");
       return;
     }
     if (novaSenha !== confirmarSenha) {
-      toast.error("As senhas não coincidem.");
+      toast.error("As novas senhas não coincidem.");
+      return;
+    }
+    if (senhaAtual === novaSenha) {
+      toast.error("A nova senha deve ser diferente da senha atual.");
       return;
     }
 
     setSalvandoSenha(true);
     try {
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user || !user.email) return;
 
+      // Autentica com a senha digitada para validar identidade
+      const credencial = EmailAuthProvider.credential(user.email, senhaAtual);
+      await reauthenticateWithCredential(user, credencial);
+
+      // Atualiza para a nova senha
       await updatePassword(user, novaSenha);
+
       toast.success("Senha alterada com sucesso!");
       setModalSenha(false);
+      setSenhaAtual("");
       setNovaSenha("");
       setConfirmarSenha("");
     } catch (error) {
-      console.error(error);
-      if (error.code === "auth/requires-recent-login") {
-        toast.error("Por segurança, faça login novamente antes de alterar a senha.");
+      console.error("Erro na alteração de senha:", error);
+      if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+        toast.error("A senha atual digitada está incorreta.");
+      } else if (error.code === "auth/requires-recent-login") {
+        toast.error("Por segurança, saia e entre novamente antes de trocar a senha.");
       } else {
-        toast.error("Erro ao alterar senha. Tente novamente.");
+        toast.error("Não foi possível alterar a senha. Tente novamente.");
       }
     } finally {
       setSalvandoSenha(false);
@@ -577,15 +590,20 @@ export default function Perfil() {
 
       <div className="max-w-xl mx-auto space-y-6">
         
-        {/* Topo com Botão de Sair (Log Out) e Abas */}
+        {/* Topo com Botão de Sair e Abas */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-            <button onClick={() => navigate("/Menu")} className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-orange-500 transition-colors">
-              <ArrowLeft size={16} /> Painel Principal
+            <button 
+              type="button"
+              onClick={() => navigate("/Menu")} 
+              className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-orange-500 transition-colors"
+            >
+              <ArrowLeft size={16} /> Voltar
             </button>
             <button 
+              type="button"
               onClick={handleLogOut}
-              className="flex items-center gap-1.5 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 border border-red-100 px-3 py-1.5 rounded-xl transition-all"
+              className="flex items-center gap-1.5 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 border border-red-100 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
               title="Sair da conta"
             >
               <LogOut size={14} /> Sair
@@ -594,20 +612,23 @@ export default function Perfil() {
 
           <div className="flex gap-1 p-1 rounded-2xl bg-white/80 border border-slate-100 shadow-sm backdrop-blur w-full sm:w-auto justify-center">
             <button
+              type="button"
               onClick={() => setAbaAtiva("perfil")}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "perfil" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${abaAtiva === "perfil" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
             >
               Perfil
             </button>
             <button
+              type="button"
               onClick={() => setAbaAtiva("amigos")}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${abaAtiva === "amigos" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${abaAtiva === "amigos" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
             >
               <Users size={13} /> Amigos
             </button>
             <button
+              type="button"
               onClick={() => setAbaAtiva("terapeuta")}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${abaAtiva === "terapeuta" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${abaAtiva === "terapeuta" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
             >
               <Stethoscope size={13} /> Terapeuta
             </button>
@@ -668,6 +689,54 @@ export default function Perfil() {
         {abaAtiva === "perfil" && (
           <div className="space-y-6">
             
+
+          <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
+              <div className="mb-6 flex justify-between items-end">
+                <div>
+                  <span className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.18em]">Seus dados</span>
+                  <h2 className="text-lg font-black text-slate-800 mt-1">Informações pessoais</h2>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <input type="file" id="fotoInput" accept="image/*" className="hidden" onChange={handleFotoChange} />
+                
+                <EditableField 
+                  icon={User} 
+                  label="Seu Nome" 
+                  editing={editandoNome} 
+                  register={register("nome")} 
+                  onEdit={iniciarEdicaoNome} 
+                  onCancel={cancelarEdicaoNome} 
+                  onConfirm={confirmarEdicaoNome} 
+                />
+                {errors.nome && <p className="text-xs text-red-400 ml-2 -mt-2">{errors.nome.message}</p>}
+
+                <EditableField 
+                  icon={Mail} 
+                  label="E-mail de acesso" 
+                  type="email" 
+                  editing={editandoEmail} 
+                  register={register("email")} 
+                  onEdit={iniciarEdicaoEmail} 
+                  onCancel={cancelarEdicaoEmail} 
+                  onConfirm={confirmarEdicaoEmail} 
+                />
+                {errors.email && <p className="text-xs text-red-400 ml-2 -mt-2">{errors.email.message}</p>}
+
+                <div className="h-px bg-slate-100 my-7" />
+
+                <button 
+                  type="submit" 
+                  disabled={salvandoPerfil}
+                  className="w-full mt-7 py-4 rounded-2xl bg-gradient-to-r from-orange-400 to-[#E97451] hover:from-orange-500 hover:to-orange-500 text-white font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {salvandoPerfil ? <Sparkles className="size-5 animate-spin" /> : <><Save size={18} /> Salvar Alterações</>}
+                </button>
+              </form>
+            </div>
+
+
             <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
               <div className="flex items-center justify-between mb-5">
                 <div>
@@ -703,9 +772,13 @@ export default function Perfil() {
                 </div>
               </div>
 
-              <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => navigate("/conquistas")}
+                className="w-full mt-4 p-4 rounded-2xl bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-100 flex items-center justify-between text-left transition-all hover:border-orange-200 active:scale-[0.99] cursor-pointer group"
+              >
                 <div className="flex items-center gap-3">
-                  <div className="size-11 rounded-xl bg-white shadow-sm flex items-center justify-center text-orange-500">
+                  <div className="size-11 rounded-xl bg-white shadow-sm flex items-center justify-center text-orange-500 group-hover:scale-105 transition-transform">
                     <Award size={19} />
                   </div>
                   <div>
@@ -713,112 +786,8 @@ export default function Perfil() {
                     <p className="text-[10px] text-slate-500 mt-1">3 de 12 badges conquistadas</p>
                   </div>
                 </div>
-                <ChevronRight size={17} className="text-orange-300" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
-              <div className="mb-6 flex justify-between items-end">
-                <div>
-                  <span className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.18em]">Seus dados</span>
-                  <h2 className="text-lg font-black text-slate-800 mt-1">Informações pessoais</h2>
-                </div>
-                <span className="text-[9px] text-slate-400 font-bold uppercase">Múltipla escolha</span>
-              </div>
-
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-                <input type="file" id="fotoInput" accept="image/*" className="hidden" onChange={handleFotoChange} />
-                
-                <EditableField icon={User} label="Seu Nome" editing={editandoNome} register={register("nome")} onEdit={iniciarEdicaoNome} onCancel={cancelarEdicaoNome} onConfirm={confirmarEdicaoNome} />
-                {errors.nome && <p className="text-xs text-red-400 ml-2 -mt-2">{errors.nome.message}</p>}
-
-                <EditableField icon={Mail} label="E-mail de acesso" type="email" editing={editandoEmail} register={register("email")} onEdit={iniciarEdicaoEmail} onCancel={cancelarEdicaoEmail} onConfirm={confirmarEdicaoEmail} />
-                {errors.email && <p className="text-xs text-red-400 ml-2 -mt-2">{errors.email.message}</p>}
-
-                <div className="h-px bg-slate-100 my-7" />
-
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="size-10 rounded-xl bg-orange-50 flex items-center justify-center">
-                    <Sparkles className="size-5 text-orange-500" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-slate-800">Personalize sua experiência</h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Selecione uma ou mais opções.</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-[0.18em]">Foco da Jornada</label>
-                  <CustomSelect 
-                    isMulti
-                    value={objetivos} 
-                    onChange={setObjetivos} 
-                    placeholder="Quais são seus focos?" 
-                    icon={Heart} 
-                    options={[
-                      { value: "ansiedade", label: "Reduzir Ansiedade" }, { value: "estresse", label: "Lidar com Estresse" },
-                      { value: "sono", label: "Dormir Melhor" }, { value: "autoestima", label: "Trabalhar Autoestima" },
-                      { value: "autoconhecimento", label: "Autoconhecimento" }, { value: "habitos", label: "Criar Hábitos Saudáveis" },
-                      { value: "humor", label: "Acompanhar meu Humor" }, { value: "foco", label: "Melhorar Foco" },
-                      { value: "relaxamento", label: "Encontrar Relaxamento" },
-                    ]} 
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-[0.18em]">Estilo de Música</label>
-                  <CustomSelect 
-                    isMulti
-                    value={generosMusicais} 
-                    onChange={setGenerosMusicais} 
-                    placeholder="Quais suas vibes musicais?" 
-                    icon={Music} 
-                    options={[
-                      { value: "lofi", label: "Lofi / Relaxante" }, { value: "instrumental", label: "Instrumental" },
-                      { value: "classica", label: "Clássica" }, { value: "piano", label: "Piano / Soft" },
-                      { value: "acustico", label: "Acústico" }, { value: "pop", label: "Pop / Vibrante" },
-                      { value: "jazz", label: "Jazz / Soul" }, { value: "ambiente", label: "Ambient / Atmosférica" },
-                      { value: "natureza", label: "Sons da Natureza" }, { value: "chuva", label: "Chuva / Sons de Água" },
-                    ]} 
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-[0.18em]">Tipo de Filme</label>
-                  <CustomSelect 
-                    isMulti
-                    value={generosFilmes} 
-                    onChange={setGenerosFilmes} 
-                    placeholder="Tipos de filme favoritos?" 
-                    icon={Film} 
-                    options={[
-                      { value: "comfort", label: "Comfort Movie" }, { value: "comedia", label: "Comédia / Leve" },
-                      { value: "romance", label: "Romance" }, { value: "animacao", label: "Animação / Fantasia" },
-                      { value: "aventura", label: "Aventura" }, { value: "motivacional", label: "Motivacional" },
-                      { value: "documentario", label: "Documentários" }, { value: "drama", label: "Drama Leve" },
-                      { value: "musical", label: "Musicais" }, { value: "nostalgico", label: "Nostálgico" },
-                    ]} 
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-[0.18em]">Melhor Horário</label>
-                  <CustomSelect 
-                    isMulti
-                    value={momentosFavoritos} 
-                    onChange={setMomentosFavoritos} 
-                    placeholder="Melhor horário de foco?" 
-                    icon={Clock3} 
-                    options={[
-                      { value: "manha", label: "☀️ Manhã" }, { value: "tarde", label: "🌤️ Tarde" }, { value: "noite", label: "🌙 Noite" },
-                    ]} 
-                  />
-                </div>
-
-                <button type="submit" className="w-full mt-7 py-4 rounded-2xl bg-gradient-to-r from-orange-400 to-[#E97451] hover:from-orange-500 hover:to-orange-500 text-white font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-                  <Save size={18} /> Salvar Alterações
-                </button>
-              </form>
+                <ChevronRight size={17} className="text-orange-300 group-hover:text-orange-500 transition-colors" />
+              </button>
             </div>
 
             <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
@@ -827,21 +796,33 @@ export default function Perfil() {
                 <h2 className="text-lg font-black text-slate-800 mt-1">Configurações</h2>
               </div>
               <div className="space-y-2">
-                <button type="button" onClick={() => setModalNotificacoes(true)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-100 hover:bg-orange-50 hover:border-orange-100 transition-all">
+                <button 
+                  type="button" 
+                  onClick={() => setModalNotificacoes(true)} 
+                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-100 hover:bg-orange-50 hover:border-orange-100 transition-all cursor-pointer"
+                >
                   <div className="flex items-center gap-3">
                     <div className="size-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><Bell size={17} className="text-slate-400" /></div>
                     <div className="text-left"><span className="block text-sm font-bold text-slate-700">Notificações e Horários</span><span className="text-[10px] text-slate-400">Personalize seus lembretes</span></div>
                   </div>
                   <ChevronRight size={16} className="text-slate-300" />
                 </button>
-                <button type="button" onClick={() => setModalSenha(true)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-100 hover:bg-orange-50 hover:border-orange-100 transition-all">
+                <button 
+                  type="button" 
+                  onClick={() => setModalSenha(true)} 
+                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-100 hover:bg-orange-50 hover:border-orange-100 transition-all cursor-pointer"
+                >
                   <div className="flex items-center gap-3">
                     <div className="size-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><KeyRound size={17} className="text-slate-400" /></div>
                     <div className="text-left"><span className="block text-sm font-bold text-slate-700">Alterar Senha</span><span className="text-[10px] text-slate-400">Atualize sua senha de acesso</span></div>
                   </div>
                   <ChevronRight size={16} className="text-slate-300" />
                 </button>
-                <button type="button" onClick={() => setModalPrivacidade(true)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-100 hover:bg-orange-50 hover:border-orange-100 transition-all">
+                <button 
+                  type="button" 
+                  onClick={() => setModalPrivacidade(true)} 
+                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-100 hover:bg-orange-50 hover:border-orange-100 transition-all cursor-pointer"
+                >
                   <div className="flex items-center gap-3">
                     <div className="size-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><Lock size={17} className="text-slate-400" /></div>
                     <div className="text-left"><span className="block text-sm font-bold text-slate-700">Privacidade (LGPD)</span><span className="text-[10px] text-slate-400">Gerenciamento de dados</span></div>
@@ -851,24 +832,6 @@ export default function Perfil() {
               </div>
             </div>
 
-            <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
-              <div className="mb-5">
-                <span className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.18em]">Estamos aqui</span>
-                <h2 className="text-lg font-black text-slate-800 mt-1">Precisa de Ajuda?</h2>
-              </div>
-              <div className="space-y-2">
-                <button type="button" onClick={() => setModalAjuda(true)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-orange-50/70 border border-orange-100 hover:bg-orange-100 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><HelpCircle size={17} className="text-orange-500" /></div>
-                    <div className="text-left">
-                      <span className="block text-sm font-bold text-orange-600">Central de Ajuda</span>
-                      <span className="text-[10px] text-orange-400">Fale conosco e Acessibilidade</span>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-orange-300" />
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -884,9 +847,20 @@ export default function Perfil() {
             <form onSubmit={adicionarAmigo} className="flex gap-2 mb-7">
               <div className="relative flex-1">
                 <UserPlus className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                <input type="text" value={nomeAmigoBusca} onChange={(e) => setNomeAmigoBusca(e.target.value)} placeholder="Nome de usuário..." className="w-full pl-10 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm focus:bg-white focus:border-orange-300 focus:ring-4 focus:ring-orange-400/10 transition-all" />
+                <input 
+                  type="text" 
+                  value={nomeAmigoBusca} 
+                  onChange={(e) => setNomeAmigoBusca(e.target.value)} 
+                  placeholder="Nome de usuário..." 
+                  className="w-full pl-10 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm focus:bg-white focus:border-orange-300 focus:ring-4 focus:ring-orange-400/10 transition-all" 
+                />
               </div>
-              <button type="submit" className="px-5 rounded-2xl bg-orange-400 hover:bg-orange-500 text-white text-xs font-bold shadow-md shadow-orange-500/20 transition-all">Adicionar</button>
+              <button 
+                type="submit" 
+                className="px-5 rounded-2xl bg-orange-400 hover:bg-orange-500 text-white text-xs font-bold shadow-md shadow-orange-500/20 transition-all cursor-pointer"
+              >
+                Adicionar
+              </button>
             </form>
 
             <div className="space-y-3">
@@ -910,7 +884,12 @@ export default function Perfil() {
                         </div>
                         <span className="text-sm font-bold text-slate-700">{amigo.nome}</span>
                       </div>
-                      <button type="button" onClick={() => removerAmigo(amigo.id)} className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all" title="Remover amigo">
+                      <button 
+                        type="button" 
+                        onClick={() => removerAmigo(amigo.id)} 
+                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer" 
+                        title="Remover amigo"
+                      >
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -954,7 +933,10 @@ export default function Perfil() {
                     className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-blue-200"
                     required
                   />
-                  <button type="submit" className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20">
+                  <button 
+                    type="submit" 
+                    className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                  >
                     Conectar
                   </button>
                 </form>
@@ -972,6 +954,7 @@ export default function Perfil() {
                     </div>
                   </div>
                   <button 
+                    type="button"
                     onClick={() => {
                       if (window.confirm("Deseja desconectar deste terapeuta?")) {
                         setTerapeutaVinculado(null);
@@ -979,7 +962,7 @@ export default function Perfil() {
                         toast.success("Desconectado do terapeuta.");
                       }
                     }}
-                    className="text-[10px] font-bold text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all"
+                    className="text-[10px] font-bold text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
                   >
                     Desconectar
                   </button>
@@ -1025,7 +1008,7 @@ export default function Perfil() {
                     <button 
                       type="button" 
                       onClick={handleEnviarDocumento}
-                      className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                      className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all cursor-pointer"
                       title="Enviar documento (PDF, Imagem)"
                     >
                       <Paperclip size={18} />
@@ -1037,7 +1020,7 @@ export default function Perfil() {
                       onChange={(e) => setNovaMensagem(e.target.value)}
                       className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-200"
                     />
-                    <button type="submit" className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-sm">
+                    <button type="submit" className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-sm cursor-pointer">
                       <Send size={16} />
                     </button>
                   </form>
@@ -1053,13 +1036,36 @@ export default function Perfil() {
         {modalSenha && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-white w-full max-w-sm rounded-[2.5rem] p-7 shadow-2xl relative">
-              <button onClick={() => setModalSenha(false)} className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={16} /></button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setModalSenha(false);
+                  setSenhaAtual("");
+                  setNovaSenha("");
+                  setConfirmarSenha("");
+                }} 
+                className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
               
               <div className="size-12 rounded-2xl bg-orange-50 flex items-center justify-center mb-4"><KeyRound className="text-orange-500" size={24} /></div>
               <h2 className="text-xl font-black text-slate-800">Alterar Senha</h2>
-              <p className="text-xs text-slate-500 mt-1 mb-5">Insira sua nova senha de acesso.</p>
+              <p className="text-xs text-slate-500 mt-1 mb-5">Confirme sua senha atual para cadastrar uma nova.</p>
               
               <form onSubmit={handleAlterarSenha} className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Senha Atual</label>
+                  <input 
+                    type="password" 
+                    placeholder="Digite sua senha atual" 
+                    value={senhaAtual} 
+                    onChange={(e) => setSenhaAtual(e.target.value)} 
+                    className="w-full mt-1 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-300"
+                    required 
+                  />
+                </div>
+                
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nova Senha</label>
                   <input 
@@ -1089,7 +1095,7 @@ export default function Perfil() {
                 <button 
                   type="submit" 
                   disabled={salvandoSenha}
-                  className="w-full py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                 >
                   {salvandoSenha ? <Sparkles className="size-5 animate-spin" /> : <><Check size={16} /> Salvar Nova Senha</>}
                 </button>
@@ -1101,7 +1107,13 @@ export default function Perfil() {
         {modalNotificacoes && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative">
-              <button onClick={() => setModalNotificacoes(false)} className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={16} /></button>
+              <button 
+                type="button"
+                onClick={() => setModalNotificacoes(false)} 
+                className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
               
               <div className="size-12 rounded-2xl bg-orange-50 flex items-center justify-center mb-4"><Bell className="text-orange-500" size={24} /></div>
               <h2 className="text-xl font-black text-slate-800">Notificações</h2>
@@ -1147,7 +1159,13 @@ export default function Perfil() {
         {modalPrivacidade && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-white w-full max-w-sm rounded-[2.5rem] p-7 shadow-2xl relative">
-              <button onClick={() => setModalPrivacidade(false)} className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={16} /></button>
+              <button 
+                type="button"
+                onClick={() => setModalPrivacidade(false)} 
+                className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
               
               <div className="size-12 rounded-2xl bg-emerald-50 flex items-center justify-center mb-4"><ShieldCheck className="text-emerald-500" size={24} /></div>
               <h2 className="text-xl font-black text-slate-800">Privacidade e LGPD</h2>
@@ -1169,7 +1187,13 @@ export default function Perfil() {
         {modalAjuda && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-white w-full max-w-md rounded-[2.5rem] p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-              <button onClick={() => setModalAjuda(false)} className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={16} /></button>
+              <button 
+                type="button"
+                onClick={() => setModalAjuda(false)} 
+                className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
               
               <div className="size-12 rounded-2xl bg-orange-50 flex items-center justify-center mb-4"><HelpCircle className="text-orange-500" size={24} /></div>
               <h2 className="text-xl font-black text-slate-800">Central de Ajuda</h2>
@@ -1193,7 +1217,7 @@ export default function Perfil() {
                 
                 <textarea rows="3" placeholder="Escreva sua mensagem aqui..." required className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 text-sm outline-none focus:ring-2 focus:ring-orange-300 resize-none text-slate-700 relative z-10" />
 
-                <button type="submit" className="w-full py-3.5 rounded-2xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors relative z-10">
+                <button type="submit" className="w-full py-3.5 rounded-2xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors relative z-10 cursor-pointer">
                   <Send size={16} /> Enviar Mensagem
                 </button>
               </form>

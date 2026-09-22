@@ -137,7 +137,7 @@ export default function Conquistas() {
             onClick={() => navigate(-1)} 
             className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-orange-500 transition-colors"
           >
-            <ArrowLeft size={16} /> Voltar ao Perfil
+            <ArrowLeft size={16} /> Voltar
           </button>
 
           <div className="flex items-center gap-1.5 bg-white/80 border border-slate-100 px-3 py-1.5 rounded-full shadow-sm backdrop-blur">

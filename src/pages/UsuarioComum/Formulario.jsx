@@ -2,9 +2,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, ChevronRight, ChevronLeft } from "lucide-react";
-import logo from "../assets/LogoBrancoReduzido.png";
+import logo from "../../assets/LogoBrancoReduzido.png";
 
-import { db, auth } from "../firebaseConfig";
+import { db, auth } from "../../firebaseConfig";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 const questions = [

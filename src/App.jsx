@@ -2,8 +2,9 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner"; 
 import ScrollToTop from "./components/ScrollToTop";
 
-import Home from "./pages/PaginasComuns/Home";
-import Menu from "./pages/PaginasComuns/Menu";
+import Home  from "./pages/PaginasComuns/Home";
+import Menu  from "./pages/PaginasComuns/Menu";
+import Senha from "./pages/PaginasComuns/Senha";
 
 
 // IMPORTS - USUÁRIO COMUM (PACIENTE)
@@ -12,7 +13,7 @@ import Login                  from "./pages/UsuarioComum/Login";
 import Humor                  from "./pages/UsuarioComum/Humor";
 import Calendario             from "./pages/UsuarioComum/Calendario"; 
 import Perfil                 from "./pages/UsuarioComum/Perfil"; 
-import RecuperarSenha         from './pages/UsuarioComum/ResetPassword'; 
+import ResetPassword         from './pages/UsuarioComum/ResetPassword'; 
 import Meditacao              from "./pages/UsuarioComum/Meditacao";
 import Conquistas             from "./pages/UsuarioComum/Conquistas";
 import Loja                   from "./pages/UsuarioComum/Loja";
@@ -22,6 +23,8 @@ import SalaSessao             from "./pages/PaginasComuns/SalaSessao";
 import Diario                 from "./pages/UsuarioComum/Diario";
 import SosRespiracao          from "./pages/UsuarioComum/SosRespiracao";
 import MinhaRede              from "./pages/UsuarioComum/MinhaRede";
+import Formulario             from "./pages/UsuarioComum/Formulario";
+import AnaliseHumor           from "./pages/UsuarioComum/analiseHumor";
 
 // IMPORTS - PSICÓLOGO
 import PerfilPsicologo        from "./pages/Psicologo/PerfilPsicologo";
@@ -48,7 +51,7 @@ function App() {
         <Route path="/calendario" element={<Calendario />} />
         <Route path="/menu" element={<Menu />} />
         <Route path="/perfil" element={<Perfil />} />
-        <Route path="/recuperarSenha" element={<RecuperarSenha />} />
+        <Route path="/ResetPassword" element={<ResetPassword />} />
         <Route path="/meditacao" element={<Meditacao />} />
         <Route path="/conquistas" element={<Conquistas />} />
         <Route path="/loja" element={<Loja />} />
@@ -58,6 +61,9 @@ function App() {
         <Route path="/diario" element={<Diario />} />
         <Route path="/sos" element={<SosRespiracao />} />
         <Route path="/minha-rede" element={<MinhaRede />} />
+        <Route path="/senha" element={<Senha />}/>
+        <Route path="/formulario" element={<Formulario />}/>
+        <Route path="/AnaliseHumor" element={<AnaliseHumor />} />
         
         
         {/* ROTAS DO PSICÓLOGO */}
