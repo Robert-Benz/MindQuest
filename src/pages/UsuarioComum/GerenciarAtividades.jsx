@@ -1,18 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, ListTodo, Sparkles, Trash2, 
-  CheckCircle2, Circle, CalendarHeart, RefreshCw, Clock, Zap 
+import { ListTodo, Sparkles, Trash2, CheckCircle2, Circle, CalendarHeart, RefreshCw, Clock, Zap 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import { 
-  collection, addDoc, getDocs, updateDoc, 
-  deleteDoc, doc, query, orderBy, limit, getDoc, increment 
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, limit, getDoc, increment 
 } from "firebase/firestore";
+
 import { toast } from "sonner";
 import BottomNav from "../../components/BottomNav";
+import HeaderUsuario from "../../components/HeaderUsuario";
 import { gerarAtividadesPersonalizadas } from "../../services/aiService";
 
 export default function GerenciarAtividades() {
@@ -49,57 +48,6 @@ export default function GerenciarAtividades() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const gerarMissoesLocaisFallback = (humor) => {
-    if (humor === "ansioso" || humor === "estressado" || humor === "triste") {
-      return [
-        {
-          titulo: "Respiração Diafragmática",
-          descricao: "Inspire em 4 segundos e solte em 6 para desacelerar o ritmo cardíaco.",
-          categoria: "Relaxamento",
-          tempoEstimado: "5 min",
-          xp: 15
-        },
-        {
-          titulo: "Música Conforto",
-          descricao: "Ouça uma música calma que te traga memórias agradáveis.",
-          categoria: "Criatividade",
-          tempoEstimado: "6 min",
-          xp: 10
-        },
-        {
-          titulo: "Alongamento Suave",
-          descricao: "Gire os ombros e relaxe a tensão do pescoço devagar.",
-          categoria: "Corpo",
-          tempoEstimado: "5 min",
-          xp: 10
-        }
-      ];
-    }
-    return [
-      {
-        titulo: "Pausa Consciente",
-        descricao: "Beba um copo de água prestando atenção plena no momento.",
-        categoria: "Saúde",
-        tempoEstimado: "3 min",
-        xp: 10
-      },
-      {
-        titulo: "Caminhada Rápida",
-        descricao: "Dê uma volta para arejar os pensamentos e alongar as pernas.",
-        categoria: "Movimento",
-        tempoEstimado: "15 min",
-        xp: 20
-      },
-      {
-        titulo: "Gratidão do Dia",
-        descricao: "Pense em duas coisas boas que aconteceram recentemente.",
-        categoria: "Mente",
-        tempoEstimado: "5 min",
-        xp: 15
-      }
-    ];
   };
 
   const handleGerarComIA = async () => {
@@ -210,23 +158,9 @@ export default function GerenciarAtividades() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff5f0_0%,_#fffbf9_38%,_#fffaf7_100%)] p-4 md:p-8 text-slate-800 antialiased font-sans pb-32">
+      
+      <HeaderUsuario />
       <div className="max-w-xl mx-auto space-y-6">
-        
-        {/* Topo e Navegação */}
-        <div className="flex items-center justify-between">
-          <button 
-            type="button"
-            onClick={() => navigate("/Menu")} 
-            className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-orange-500 transition-colors cursor-pointer"
-          >
-            <ArrowLeft size={16} /> Painel Principal
-          </button>
-          <div className="flex items-center gap-1.5 bg-white/80 border border-slate-100 px-3 py-1.5 rounded-full shadow-sm backdrop-blur">
-            <ListTodo size={14} className="text-orange-500" />
-            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Missões</span>
-          </div>
-        </div>
-
         {/* Resumo Diário */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}

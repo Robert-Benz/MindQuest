@@ -3,7 +3,6 @@ import { Toaster } from "sonner";
 import ScrollToTop from "./components/ScrollToTop";
 
 import Home  from "./pages/PaginasComuns/Home";
-import Menu  from "./pages/PaginasComuns/Menu";
 import Senha from "./pages/PaginasComuns/Senha";
 
 
@@ -25,14 +24,17 @@ import SosRespiracao          from "./pages/UsuarioComum/SosRespiracao";
 import MinhaRede              from "./pages/UsuarioComum/MinhaRede";
 import Formulario             from "./pages/UsuarioComum/Formulario";
 import AnaliseHumor           from "./pages/UsuarioComum/analiseHumor";
+import Menu                   from "./pages/UsuarioComum/Menu";
 
 // IMPORTS - PSICÓLOGO
-import PerfilPsicologo        from "./pages/Psicologo/PerfilPsicologo";
+import MenuPsicologo          from "./pages/Psicologo/menuPsicologo";
 import CadastroDeServico      from "./pages/Psicologo/CadastroDeServico"; 
 import AvaliacoesPsicologo    from "./pages/Psicologo/AvaliacoesPsicologo"; 
 import LoginPsicologo         from "./pages/Psicologo/LoginPsicologo";
 import HistoricoPaciente      from "./pages/Psicologo/HistoricoPaciente";
 import CalendarioPsicologo    from "./pages/Psicologo/CalendarioPsicologo";
+import PerfilPsicologo        from "./pages/Psicologo/PerfilPsicologo";
+
 
 
 function App() {
@@ -67,12 +69,13 @@ function App() {
         
         
         {/* ROTAS DO PSICÓLOGO */}
-        <Route path="/painel-psicologo" element={<PerfilPsicologo />} />
+        <Route path="/menuPsicologo" element={<MenuPsicologo />} />
         <Route path="/cadastroDeServico" element={<CadastroDeServico />} />
         <Route path="/avaliacoesPsicologo" element={<AvaliacoesPsicologo />} />
         <Route path="/loginPsicologo" element={<LoginPsicologo />} />
         <Route path="/historicoPaciente" element={<HistoricoPaciente />} />
         <Route path="/calendario-psicologo" element={<CalendarioPsicologo />} />
+        <Route path="/perfilPsicologo" element={<PerfilPsicologo />} />
         
       </Routes>
     </Router>

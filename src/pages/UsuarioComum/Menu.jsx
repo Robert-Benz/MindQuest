@@ -16,12 +16,14 @@ import {
   onSnapshot, getDocs, getDoc 
 } from "firebase/firestore";
 import { gerarInsightDiario } from "../../services/aiService";
+import { analiseSemanal } from "../../services/analiseHumorService";
 
 const LogoPrincipal = () => (
   <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10">
     <img src={logoReduzido} alt="MindQuest Logo" className="w-full h-full object-contain" />
   </div>
 );
+
 
 export default function Menu() {
   const navigate = useNavigate();
@@ -31,6 +33,7 @@ export default function Menu() {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [isHumorModalOpen, setIsHumorModalOpen] = useState(false);
+  const [avisoNovaAnalise, setAvisoNovaAnalise] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [ultimoHumor, setUltimoHumor] = useState(null);
@@ -75,6 +78,17 @@ export default function Menu() {
       if (!user) {
         navigate("/login");
         return;
+      }
+
+      try {
+        await user.getIdToken();
+        analiseSemanal(user.uid).then((resultado) => {
+          if (resultado?.gerouNova && resultado?.analise) {
+            setAvisoNovaAnalise(resultado.analise);
+          }
+        });
+      } catch (authErr) {
+        console.warn("Aguardando confirmação de sessão...", authErr);
       }
 
       try {
@@ -525,6 +539,60 @@ export default function Menu() {
                 <span>REGISTRAR HUMOR</span>
                 <ChevronRight size={18} />
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP: NOTIFICAÇÃO DE NOVA ANÁLISE PRONTA */}
+      <AnimatePresence>
+        {avisoNovaAnalise && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-orange-100 text-center space-y-4"
+            >
+              <button
+                type="button"
+                onClick={() => setAvisoNovaAnalise(null)}
+                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="size-14 mx-auto rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-3xl select-none">
+                {avisoNovaAnalise.emojiPredominante || "✨"}
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-orange-500">Novo Relatório</span>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">Análise Emocional Pronta!</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  A IA avaliou os seus registros do dia anterior. Deseja ver os seus insights agora?
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAvisoNovaAnalise(null)}
+                  className="flex-1 py-3 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                >
+                  Depois
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvisoNovaAnalise(null);
+                    navigate("/analiseHumor");
+                  }}
+                  className="flex-1 py-3 text-xs font-bold text-white bg-[#E97451] hover:bg-[#d66340] rounded-xl shadow-md shadow-orange-500/20 transition-all cursor-pointer"
+                >
+                  Ver Análise
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

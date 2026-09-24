@@ -18,7 +18,7 @@ export default function BottomNav() {
       <div className="h-28 w-full pointer-events-none" aria-hidden="true" />
 
       {/* Barra de Navegação Fixa */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-slate-100 py-3 px-6 flex justify-around items-center max-w-lg mx-auto rounded-t-2xl shadow-lg shadow-slate-900/5">
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-md border-t border-slate-100 py-3 px-6 flex justify-around items-center max-w-lg mx-auto rounded-t-2xl shadow-lg shadow-slate-900/5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname.toLowerCase() === item.path.toLowerCase();

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  ArrowLeft, ShieldCheck, Mail, Lock, User, Sparkles, LogIn, UserPlus 
+  ArrowLeft, ShieldCheck, Mail, Lock, User, Sparkles, LogIn, UserPlus, Eye, EyeOff 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
@@ -19,6 +19,9 @@ export default function LoginPsicologo() {
 
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
   const [nome, setNome] = useState("");
   const [crp, setCrp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,10 +34,16 @@ export default function LoginPsicologo() {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, senha);
         toast.success("Login realizado com sucesso!");
-        navigate("/painel-psicologo");
+        navigate("/menuPsicologo");
       } else {
         if (!nome || !crp) {
           toast.error("Por favor, preencha o Nome e o CRP.");
+          setLoading(false);
+          return;
+        }
+
+        if (senha !== confirmarSenha) {
+          toast.error("As senhas não coincidem.");
           setLoading(false);
           return;
         }
@@ -82,12 +91,10 @@ export default function LoginPsicologo() {
         <div className="flex items-center justify-between">
           <button 
             onClick={() => navigate("/home")} 
-            className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-peach-500 transition-colors"
+            className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-peach-500 transition-colors cursor-pointer"
           >
             <ArrowLeft size={16} /> Voltar para a Tela Inicial
           </button>
-          
-
         </div>
 
         {/* Container do Formulário */}
@@ -115,8 +122,12 @@ export default function LoginPsicologo() {
           <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1.5 rounded-2xl mb-6">
             <button
               type="button"
-              onClick={() => setIsLogin(true)}
-              className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+              onClick={() => {
+                setIsLogin(true);
+                setMostrarSenha(false);
+                setMostrarConfirmarSenha(false);
+              }}
+              className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 isLogin ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -124,8 +135,12 @@ export default function LoginPsicologo() {
             </button>
             <button
               type="button"
-              onClick={() => setIsLogin(false)}
-              className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+              onClick={() => {
+                setIsLogin(false);
+                setMostrarSenha(false);
+                setMostrarConfirmarSenha(false);
+              }}
+              className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 !isLogin ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -197,20 +212,60 @@ export default function LoginPsicologo() {
               <div className="relative mt-1">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                 <input 
-                  type="password" 
+                  type={mostrarSenha ? "text" : "password"} 
                   placeholder="••••••••" 
                   value={senha} 
                   onChange={(e) => setSenha(e.target.value)} 
-                  className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-peach-200 transition-all text-slate-700"
+                  className="w-full pl-11 pr-12 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-peach-200 transition-all text-slate-700"
                   required 
                 />
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenha(!mostrarSenha)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 transition-colors cursor-pointer"
+                  title={mostrarSenha ? "Ocultar senha" : "Ver senha"}
+                >
+                  {mostrarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
+
+            <AnimatePresence>
+              {!isLogin && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <label className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-widest">Confirmar Senha</label>
+                  <div className="relative mt-1">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                    <input 
+                      type={mostrarConfirmarSenha ? "text" : "password"} 
+                      placeholder="••••••••" 
+                      value={confirmarSenha} 
+                      onChange={(e) => setConfirmarSenha(e.target.value)} 
+                      className="w-full pl-11 pr-12 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-peach-200 transition-all text-slate-700"
+                      required={!isLogin}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 transition-colors cursor-pointer"
+                      title={mostrarConfirmarSenha ? "Ocultar senha" : "Ver senha"}
+                    >
+                      {mostrarConfirmarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full py-4 mt-2 rounded-2xl bg-[#E97451] hover:bg-[#C06043] text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all flex justify-center items-center gap-2 active:scale-95 disabled:opacity-50"
+              className="w-full py-4 mt-2 rounded-2xl bg-[#E97451] hover:bg-[#C06043] text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all flex justify-center items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <Sparkles className="size-5 animate-spin" />

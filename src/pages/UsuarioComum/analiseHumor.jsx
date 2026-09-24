@@ -7,12 +7,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import { 
-  collection, getDocs, doc, setDoc 
-} from "firebase/firestore";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { toast } from "sonner";
 import BottomNav from "../../components/BottomNav";
-import { gerarRelatorioSemanalIA } from "../../services/aiService";
 
 export default function AnaliseHumor() {
   const navigate = useNavigate();
@@ -23,115 +20,27 @@ export default function AnaliseHumor() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        navigate("/login");
+        navigate("/home");
         return;
       }
-      await carregarEProcessar(user.uid);
+      await carregarHistorico(user.uid);
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  const carregarEProcessar = async (uid) => {
+  const carregarHistorico = async (uid) => {
     try {
-      // 1. Busca todos os registros de humor (sem filtros rígidos que quebrem no Firestore)
-      const humorRef = collection(db, "usuarios", uid, "registrosHumor");
-      const humorSnap = await getDocs(humorRef);
-      
-      const registros = humorSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      console.log("Registros de humor encontrados no banco:", registros);
-
-      // 2. Busca subcoleção analisesSemanais
+      // Apenas lê o que o Menu gerou e gravou
       const analiseRef = collection(db, "usuarios", uid, "analisesSemanais");
-      const analiseSnap = await getDocs(analiseRef);
-      let listaAnalises = analiseSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      // Identificador único para a análise de hoje
-      const hojeStr = new Date().toISOString().split("T")[0];
-      const docIdHoje = `analise_${hojeStr}`;
-
-      const jaExisteHoje = listaAnalises.some(a => a.id === docIdHoje);
-
-      // Se temos registros de humor e ainda não gerou a de hoje, gera e grava
-      if (!jaExisteHoje && registros.length > 0) {
-        console.log("Gerando nova análise para hoje...");
-        const nova = await gerarEGravacao(uid, docIdHoje, registros);
-        if (nova) {
-          listaAnalises.unshift(nova);
-        }
-      }
-
-      setAnalises(listaAnalises);
+      const analiseSnap = await getDocs(query(analiseRef, orderBy("geradoEm", "desc")));
+      
+      const lista = analiseSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setAnalises(lista);
     } catch (err) {
-      console.error("Erro detalhado no fluxo de análises:", err);
-      toast.error("Erro ao carregar análises. Veja o console.");
+      console.error("Erro ao carregar histórico de análises:", err);
+      toast.error("Erro ao carregar análises.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const gerarEGravacao = async (uid, docId, registros) => {
-    try {
-      // Mapeamento de contagem dos humores reais cadastrados
-      const contagemHumor = {};
-      const contagemTags = {};
-
-      registros.forEach(r => {
-        const h = r.humor || "Neutro";
-        contagemHumor[h] = (contagemHumor[h] || 0) + 1;
-
-        if (r.fatores && Array.isArray(r.fatores)) {
-          r.fatores.forEach(f => {
-            contagemTags[f] = (contagemTags[f] || 0) + 1;
-          });
-        }
-      });
-
-      // Humor que mais apareceu (ex: se empatou entre Ansioso e Feliz, pega o mais recente)
-      const humorPredominante = Object.keys(contagemHumor).reduce((a, b) => 
-        contagemHumor[a] > contagemHumor[b] ? a : b, 
-        registros[0]?.humor || "Neutro"
-      );
-
-      const emojiPredominante = registros.find(r => r.humor === humorPredominante)?.emoji || "🙂";
-      const fatoresMaisComuns = Object.keys(contagemTags)
-        .sort((a, b) => contagemTags[b] - contagemTags[a])
-        .slice(0, 3);
-
-      let feedbackIA = "";
-      try {
-        feedbackIA = await gerarRelatorioSemanalIA({
-          totalRegistros: registros.length,
-          humorPredominante,
-          fatoresMaisComuns,
-          atividadesConcluidas: []
-        });
-      } catch (errIA) {
-        console.warn("Falha no aiService, aplicando texto gerado padrão:", errIA);
-        feedbackIA = `Você registrou oscilações entre ${Object.keys(contagemHumor).join(" e ")}. Notamos que você tem buscado acolher suas emoções. Continue reservando momentos de pausa para manter sua clareza!`;
-      }
-
-      const hoje = new Date();
-      const rotuloFormatado = `Análise de ${hoje.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}`;
-
-      const novaAnalise = {
-        id: docId,
-        rotulo: rotuloFormatado,
-        totalRegistros: registros.length,
-        humorPredominante,
-        emojiPredominante,
-        fatoresMaisComuns,
-        textoFeedbackIA: feedbackIA,
-        geradoEm: new Date().toISOString()
-      };
-
-      // Gravação direta no Firestore: usuarios/{uid}/analisesSemanais/{docId}
-      await setDoc(doc(db, "usuarios", uid, "analisesSemanais", docId), novaAnalise);
-      console.log("Análise salva com sucesso no Firestore!", novaAnalise);
-
-      return novaAnalise;
-    } catch (err) {
-      console.error("Erro ao salvar análise no Firestore:", err);
-      return null;
     }
   };
 
@@ -174,11 +83,11 @@ export default function AnaliseHumor() {
 
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Histórico de Análises</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Insights automáticos gerados pela IA sobre os seus últimos registros.
+            Insights automáticos gerados pela IA sobre os seus registros emocionais.
           </p>
         </motion.div>
 
-        {/* Lista de Análises com Card Detalhado */}
+        {/* Lista de Análises */}
         <div className="space-y-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2">
             Relatórios Processados
@@ -192,7 +101,9 @@ export default function AnaliseHumor() {
               >
                 <Smile className="mx-auto size-10 text-slate-300 mb-3" />
                 <p className="text-sm font-bold text-slate-500">Nenhuma análise disponível ainda</p>
-                <p className="text-[11px] text-slate-400 mt-1">Assim que você registrar humores, o relatório aparecerá aqui.</p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Ao virar o dia com registros de humor cadastrados, o relatório diário aparecerá aqui.
+                </p>
               </motion.div>
             ) : (
               analises.map((item) => (
@@ -213,7 +124,7 @@ export default function AnaliseHumor() {
                     <div className="space-y-1 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[9px] font-black uppercase tracking-wider text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                          <Calendar size={10} /> {item.rotulo || "Relatório Recente"}
+                          <Calendar size={10} /> {item.rotulo || "Relatório"}
                         </span>
                         <span className="text-[10px] text-slate-400 font-medium">
                           {item.totalRegistros} {item.totalRegistros === 1 ? "registro" : "registros"}
@@ -239,7 +150,7 @@ export default function AnaliseHumor() {
 
       </div>
 
-      {/* Modal Rico com as Métricas Reais */}
+      {/* Modal Expandido */}
       <AnimatePresence>
         {analiseAberta && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/30 backdrop-blur-sm">
@@ -269,7 +180,6 @@ export default function AnaliseHumor() {
                 </h2>
               </div>
 
-              {/* Humor Predominante */}
               <div className="bg-[#FFFDF4] p-5 rounded-2xl border border-amber-100/90 text-center mb-5 shadow-sm">
                 <div className="text-6xl mb-2 select-none drop-shadow-sm">
                   {analiseAberta.emojiPredominante || "😐"}
@@ -283,7 +193,6 @@ export default function AnaliseHumor() {
                 </p>
               </div>
 
-              {/* Tags de Fatores */}
               {analiseAberta.fatoresMaisComuns?.length > 0 && (
                 <div className="mb-5 space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 ml-1">
@@ -302,7 +211,6 @@ export default function AnaliseHumor() {
                 </div>
               )}
 
-              {/* Feedback IA */}
               <div className="bg-gradient-to-br from-orange-500/5 via-amber-400/5 to-transparent p-5 rounded-2xl border border-orange-200/40 relative mb-6">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="bg-orange-100 p-1 rounded-lg">

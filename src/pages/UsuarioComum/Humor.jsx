@@ -223,6 +223,7 @@ export default function Humor() {
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                spellCheck={false}
                 placeholder="Quer detalhar mais algum ponto do seu dia?"
                 className="w-full h-24 p-5 bg-peach-50 border-none rounded-3xl focus:ring-2 focus:ring-peach-400 transition-all resize-none shadow-inner outline-none text-sm"
               />

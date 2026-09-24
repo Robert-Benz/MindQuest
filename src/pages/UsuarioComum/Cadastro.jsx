@@ -174,6 +174,12 @@ export default function Cadastro() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
       const user = userCredential.user;
 
+      const caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let codigoUnico = "PAC-";
+      for (let i = 0; i < 5; i++) {
+        codigoUnico += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+      }
+
       await updateProfile(user, { displayName: nome });
 
       await setDoc(doc(db, "usuarios", user.uid), {
@@ -185,7 +191,8 @@ export default function Cadastro() {
         nivel: 1,
         moedas: 0,
         criadoEm: new Date().toISOString(),
-        tipoPerfil: "usuario"
+        tipoPerfil: "usuario",
+        codigoUnico,
       });
 
       toast.success("Conta criada com sucesso! Bem-vindo ao MindQuest.");

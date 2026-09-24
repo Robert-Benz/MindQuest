@@ -4,17 +4,16 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  User, Mail, Sparkles, ArrowLeft, Save,
-  CheckCircle2, Camera, Users, UserPlus, Trash2, Flame, Award,
-  Bell, Lock, HelpCircle, ChevronRight, Pencil, KeyRound,
-  Check, X, Headphones, Smile, Send, Accessibility, ShieldCheck,
-  Stethoscope, MessageSquare, Paperclip, FileText, LogOut
+  User, Mail, Sparkles, ArrowLeft, Save, CheckCircle2, Camera, Flame, Award,
+  Bell, Lock, HelpCircle, ChevronRight, Pencil, KeyRound, Check, X, Headphones,
+  Smile, Send, Accessibility, ShieldCheck, Stethoscope, MessageSquare, Paperclip,
+  FileText, LogOut, Copy
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged, updateEmail, updatePassword, signOut, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc, query, orderBy, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, addDoc, query, orderBy, onSnapshot } from "firebase/firestore";
 
 import { toast } from "sonner";
 import BottomNav from "../../components/BottomNav";
@@ -141,7 +140,7 @@ function EditableField({ icon: Icon, label, type = "text", editing, register, on
           <button
             type="button"
             onClick={onEdit}
-            className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-xl flex items-center justify-center bg-white border border-slate-100 text-slate-400 shadow-sm hover:text-orange-500 hover:bg-orange-50 hover:border-orange-200 transition-all"
+            className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-xl flex items-center justify-center bg-white border border-slate-100 text-slate-400 shadow-sm hover:text-orange-500 hover:bg-orange-50 hover:border-orange-200 transition-all cursor-pointer"
             title={`Editar ${label}`}
           >
             <Pencil size={15} />
@@ -151,7 +150,7 @@ function EditableField({ icon: Icon, label, type = "text", editing, register, on
             <button
               type="button"
               onClick={onCancel}
-              className="size-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+              className="size-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer"
               title="Cancelar"
             >
               <X size={16} />
@@ -159,7 +158,7 @@ function EditableField({ icon: Icon, label, type = "text", editing, register, on
             <button
               type="button"
               onClick={onConfirm}
-              className="size-9 rounded-xl flex items-center justify-center text-orange-500 bg-orange-50 hover:bg-orange-100 transition-all"
+              className="size-9 rounded-xl flex items-center justify-center text-orange-500 bg-orange-50 hover:bg-orange-100 transition-all cursor-pointer"
               title="Concluir edição"
             >
               <Check size={16} />
@@ -177,7 +176,7 @@ function ToggleSwitch({ checked, onChange }) {
     <button
       type="button"
       onClick={onChange}
-      className={`w-11 h-6 rounded-full p-1 transition-colors flex items-center shrink-0 ${
+      className={`w-11 h-6 rounded-full p-1 transition-colors flex items-center shrink-0 cursor-pointer ${
         checked ? "bg-orange-400" : "bg-slate-200"
       }`}
     >
@@ -196,6 +195,9 @@ export default function Perfil() {
   const [abaAtiva, setAbaAtiva] = useState("perfil"); 
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
   const [userXP, setUserXP] = useState(0);
+  
+  // Código de identificação do paciente
+  const [codigoUnico, setcodigoUnico] = useState("");
 
   // Estados de Salvamento do Perfil
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
@@ -203,16 +205,10 @@ export default function Perfil() {
   const [editandoEmail, setEditandoEmail] = useState(false);
   
   const [fotoURL, setFotoURL] = useState(null);
-  const [arquivoFoto, setArquivoFoto] = useState(null);
-  
-  const [nomeAmigoBusca, setNomeAmigoBusca] = useState("");
-  const [listaAmigos, setListaAmigos] = useState([]);
-  
   const [dadosOriginais, setDadosOriginais] = useState({ nome: "", email: "" });
 
   // Estados do Terapeuta e Chat
   const [terapeutaVinculado, setTerapeutaVinculado] = useState(null);
-  const [codigoTerapeutaInput, setCodigoTerapeutaInput] = useState("");
   const [mensagensChat, setMensagensChat] = useState([]);
   const [novaMensagem, setNovaMensagem] = useState("");
 
@@ -221,6 +217,7 @@ export default function Perfil() {
   const [modalPrivacidade, setModalPrivacidade] = useState(false);
   const [modalAjuda, setModalAjuda] = useState(false);
   const [modalSenha, setModalSenha] = useState(false);
+  const [modalLogout, setModalLogout] = useState(false);
 
   // Estados de Alteração de Senha
   const [senhaAtual, setSenhaAtual] = useState("");
@@ -265,14 +262,22 @@ export default function Perfil() {
           setUserXP(dados.xp || 0);
           if (dados.fotoURL) setFotoURL(dados.fotoURL);
           if (dados.terapeuta) setTerapeutaVinculado(dados.terapeuta);
+
+          // Verifica se já existe código de identificação ou gera um novo
+          if (dados.codigoUnico) {
+            setcodigoUnico(dados.codigoUnico);
+          } else {
+            const caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+            let novoCodigo = "MQ-";
+            for (let i = 0; i < 5; i++) {
+              novoCodigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+            }
+            await setDoc(userDocRef, { codigoUnico: novoCodigo }, { merge: true });
+            setcodigoUnico(novoCodigo);
+          }
         }
 
         setDadosOriginais({ nome: nomeAtual, email: emailAtual });
-
-        const amigosRef = collection(db, "usuarios", user.uid, "amigos");
-        const amigosSnap = await getDocs(amigosRef);
-        const amigosCarregados = amigosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setListaAmigos(amigosCarregados);
 
         reset({
           nome: nomeAtual,
@@ -311,33 +316,8 @@ export default function Perfil() {
       await signOut(auth);
       toast.success("Sessão encerrada com sucesso.");
       navigate("/login");
-    } catch (error) {
+    } catch {
       toast.error("Erro ao sair da conta.");
-    }
-  };
-
-  const handleConectarTerapeuta = async (e) => {
-    e.preventDefault();
-    if (!codigoTerapeutaInput.trim()) return;
-
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const dadosTerapeuta = {
-        nome: `Dr(a). Especialista (${codigoTerapeutaInput.toUpperCase()})`,
-        codigo: codigoTerapeutaInput.toUpperCase(),
-        crp: "CRP 06/12345",
-        vinculadoEm: new Date().toISOString()
-      };
-
-      await setDoc(doc(db, "usuarios", user.uid), { terapeuta: dadosTerapeuta }, { merge: true });
-      setTerapeutaVinculado(dadosTerapeuta);
-      setCodigoTerapeutaInput("");
-      toast.success("Terapeuta conectado com sucesso!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao conectar com terapeuta.");
     }
   };
 
@@ -379,7 +359,7 @@ export default function Perfil() {
           data: new Date().toISOString()
         });
         toast.success("Documento enviado para o terapeuta!");
-      } catch (err) {
+      } catch {
         toast.error("Erro ao enviar documento.");
       }
     };
@@ -389,7 +369,6 @@ export default function Perfil() {
   const handleFotoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setArquivoFoto(file);
     const reader = new FileReader();
     reader.onloadend = () => setFotoURL(reader.result);
     reader.readAsDataURL(file);
@@ -416,7 +395,6 @@ export default function Perfil() {
 
       setSalvandoPerfil(true);
 
-      // Atualiza o e-mail no Authentication caso tenha mudado
       if (data.email.trim() !== user.email) {
         try {
           await updateEmail(user, data.email.trim());
@@ -430,7 +408,6 @@ export default function Perfil() {
         }
       }
 
-      // Grava diretamente no Firestore (usando o Base64 já guardado em fotoURL)
       const userDocRef = doc(db, "usuarios", user.uid);
       await setDoc(userDocRef, {
         nome: data.nome.trim(),
@@ -445,7 +422,6 @@ export default function Perfil() {
       });
       setEditandoNome(false);
       setEditandoEmail(false);
-      setArquivoFoto(null);
 
       setShowSuccessBadge(true);
       setTimeout(() => setShowSuccessBadge(false), 3000);
@@ -483,11 +459,9 @@ export default function Perfil() {
       const user = auth.currentUser;
       if (!user || !user.email) return;
 
-      // Autentica com a senha digitada para validar identidade
       const credencial = EmailAuthProvider.credential(user.email, senhaAtual);
       await reauthenticateWithCredential(user, credencial);
 
-      // Atualiza para a nova senha
       await updatePassword(user, novaSenha);
 
       toast.success("Senha alterada com sucesso!");
@@ -506,43 +480,6 @@ export default function Perfil() {
       }
     } finally {
       setSalvandoSenha(false);
-    }
-  };
-
-  const adicionarAmigo = async (e) => {
-    e.preventDefault();
-    if (!nomeAmigoBusca.trim()) return;
-
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const amigosRef = collection(db, "usuarios", user.uid, "amigos");
-      const novoAmigoDoc = await addDoc(amigosRef, {
-        nome: nomeAmigoBusca.trim(),
-        adicionadoEm: new Date().toISOString(),
-      });
-
-      setListaAmigos((prev) => [...prev, { id: novoAmigoDoc.id, nome: nomeAmigoBusca.trim() }]);
-      setNomeAmigoBusca("");
-      toast.success("Amigo adicionado!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao adicionar amigo.");
-    }
-  };
-
-  const removerAmigo = async (idAmigo) => {
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      await deleteDoc(doc(db, "usuarios", user.uid, "amigos", idAmigo));
-      setListaAmigos((prev) => prev.filter((amigo) => amigo.id !== idAmigo));
-      toast.success("Amigo removido.");
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao remover amigo.");
     }
   };
 
@@ -596,13 +533,13 @@ export default function Perfil() {
             <button 
               type="button"
               onClick={() => navigate("/Menu")} 
-              className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-orange-500 transition-colors"
+              className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-orange-500 transition-colors cursor-pointer"
             >
               <ArrowLeft size={16} /> Voltar
             </button>
             <button 
               type="button"
-              onClick={handleLogOut}
+              onClick={() => setModalLogout(true)}
               className="flex items-center gap-1.5 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 border border-red-100 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
               title="Sair da conta"
             >
@@ -614,21 +551,14 @@ export default function Perfil() {
             <button
               type="button"
               onClick={() => setAbaAtiva("perfil")}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${abaAtiva === "perfil" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${abaAtiva === "perfil" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
             >
               Perfil
             </button>
             <button
               type="button"
-              onClick={() => setAbaAtiva("amigos")}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${abaAtiva === "amigos" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
-            >
-              <Users size={13} /> Amigos
-            </button>
-            <button
-              type="button"
               onClick={() => setAbaAtiva("terapeuta")}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${abaAtiva === "terapeuta" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${abaAtiva === "terapeuta" ? "bg-orange-50 text-orange-600 shadow-sm" : "text-slate-400 hover:text-slate-700"}`}
             >
               <Stethoscope size={13} /> Terapeuta
             </button>
@@ -689,8 +619,7 @@ export default function Perfil() {
         {abaAtiva === "perfil" && (
           <div className="space-y-6">
             
-
-          <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
+            <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
               <div className="mb-6 flex justify-between items-end">
                 <div>
                   <span className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.18em]">Seus dados</span>
@@ -735,7 +664,6 @@ export default function Perfil() {
                 </button>
               </form>
             </div>
-
 
             <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
               <div className="flex items-center justify-between mb-5">
@@ -835,74 +763,10 @@ export default function Perfil() {
           </div>
         )}
 
-        {/* Aba Amigos */}
-        {abaAtiva === "amigos" && (
-          <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white">
-            <div className="mb-6">
-              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.18em]">Conexões</span>
-              <h2 className="text-xl font-black text-slate-800 mt-1">Amigos & Rede de Apoio</h2>
-              <p className="text-xs text-slate-400 mt-1">Adicione pessoas para fazer parte da sua jornada.</p>
-            </div>
-
-            <form onSubmit={adicionarAmigo} className="flex gap-2 mb-7">
-              <div className="relative flex-1">
-                <UserPlus className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  value={nomeAmigoBusca} 
-                  onChange={(e) => setNomeAmigoBusca(e.target.value)} 
-                  placeholder="Nome de usuário..." 
-                  className="w-full pl-10 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-100 outline-none text-sm focus:bg-white focus:border-orange-300 focus:ring-4 focus:ring-orange-400/10 transition-all" 
-                />
-              </div>
-              <button 
-                type="submit" 
-                className="px-5 rounded-2xl bg-orange-400 hover:bg-orange-500 text-white text-xs font-bold shadow-md shadow-orange-500/20 transition-all cursor-pointer"
-              >
-                Adicionar
-              </button>
-            </form>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sua Rede de Apoio</span>
-                <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-2.5 py-1 rounded-full">{listaAmigos.length}</span>
-              </div>
-
-              {listaAmigos.length === 0 ? (
-                <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <Users className="size-9 text-slate-300 mx-auto mb-3" />
-                  <p className="text-xs text-slate-400 font-medium">Nenhum amigo adicionado ainda.</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {listaAmigos.map((amigo) => (
-                    <div key={amigo.id} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-                      <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-orange-100 text-orange-600 font-black flex items-center justify-center">
-                          {amigo.nome.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-sm font-bold text-slate-700">{amigo.nome}</span>
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={() => removerAmigo(amigo.id)} 
-                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer" 
-                        title="Remover amigo"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
         {/* Aba Terapeuta */}
         {abaAtiva === "terapeuta" && (
           <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-white space-y-6">
+            
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.18em]">Acompanhamento Clínico</span>
@@ -915,31 +779,41 @@ export default function Perfil() {
             </div>
 
             {!terapeutaVinculado ? (
-              <div className="p-6 bg-slate-50 border border-slate-100 rounded-[2rem] text-center space-y-4">
+              <div className="p-6 bg-slate-50 border border-slate-100 rounded-[2rem] text-center space-y-5">
                 <div className="size-12 bg-white rounded-2xl mx-auto flex items-center justify-center shadow-sm text-blue-500">
-                  <UserPlus size={22} />
+                  <Stethoscope size={22} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">Nenhum terapeuta conectado</h3>
-                  <p className="text-[11px] text-slate-400 mt-1">Insira o código fornecido pelo seu profissional para liberar o chat e o envio de documentos.</p>
+                  <h3 className="text-sm font-bold text-slate-800">Conecte seu Psicólogo</h3>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                    Compartilhe seu código com seu terapeuta para que ele possa acompanhar sua evolução.
+                  </p>
                 </div>
 
-                <form onSubmit={handleConectarTerapeuta} className="flex gap-2 max-w-sm mx-auto">
-                  <input 
-                    type="text" 
-                    placeholder="Ex: PSI-1234" 
-                    value={codigoTerapeutaInput}
-                    onChange={(e) => setCodigoTerapeutaInput(e.target.value)}
-                    className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-blue-200"
-                    required
-                  />
-                  <button 
-                    type="submit" 
-                    className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer"
-                  >
-                    Conectar
-                  </button>
-                </form>
+                {/* BLOCO DO CÓDIGO DO PACIENTE */}
+                <div className="p-4 bg-white border border-slate-200/80 rounded-2xl max-w-xs mx-auto shadow-sm space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-orange-500 block">
+                    Seu Código de Paciente
+                  </span>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-xl font-mono font-black tracking-widest text-slate-800">
+                      {codigoUnico || "Carregando..."}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (codigoUnico) {
+                          navigator.clipboard.writeText(codigoUnico);
+                          toast.success("Código copiado!");
+                        }
+                      }}
+                      className="p-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl transition-all cursor-pointer"
+                      title="Copiar código"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -1031,7 +905,7 @@ export default function Perfil() {
         )}
       </div>
 
-      {/* Modais */}
+      {/* Modais de Senha, Notificações, Privacidade e Ajuda */}
       <AnimatePresence>
         {modalSenha && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
@@ -1235,6 +1109,60 @@ export default function Perfil() {
                     </p>
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* MODAL DE CONFIRMAÇÃO DE LOGOUT */}
+        {modalLogout && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ y: 30, scale: 0.95 }} 
+              animate={{ y: 0, scale: 1 }} 
+              exit={{ y: 30, scale: 0.95 }} 
+              className="bg-white w-full max-w-sm rounded-[2.5rem] p-7 shadow-2xl relative text-center border border-white"
+            >
+              <button 
+                type="button"
+                onClick={() => setModalLogout(false)} 
+                className="absolute top-5 right-5 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="size-14 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4 border border-red-100 shadow-sm">
+                <LogOut size={26} />
+              </div>
+
+              <h2 className="text-xl font-black text-slate-800">Encerrar Sessão</h2>
+              <p className="text-xs text-slate-500 mt-1.5 mb-6 leading-relaxed">
+                Tem certeza que deseja finalizar a sessão?
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalLogout(false)}
+                  className="flex-1 py-3.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalLogout(false);
+                    handleLogOut();
+                  }}
+                  className="flex-1 py-3.5 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded-2xl shadow-md shadow-red-500/20 transition-all cursor-pointer"
+                >
+                  Sim, Sair
+                </button>
               </div>
             </motion.div>
           </motion.div>
