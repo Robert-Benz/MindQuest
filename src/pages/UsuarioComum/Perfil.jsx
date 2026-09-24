@@ -315,7 +315,7 @@ export default function Perfil() {
     try {
       await signOut(auth);
       toast.success("Sessão encerrada com sucesso.");
-      navigate("/login");
+      navigate("/home");
     } catch {
       toast.error("Erro ao sair da conta.");
     }

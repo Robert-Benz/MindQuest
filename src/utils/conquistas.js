@@ -1,0 +1,68 @@
+import { Smile, ListTodo, Zap, Stethoscope } from "lucide-react";
+
+export const CONFIG_CONQUISTAS = [
+  {
+    id: "humor",
+    tipo: "humor",
+    nomeBase: "Diário de Emoções",
+    icone: Smile,
+    cor: "text-pink-500",
+    bgCor: "bg-pink-50",
+    borderCor: "border-pink-100",
+    gradiente: "from-pink-400 to-rose-500",
+    niveis: [
+      { lvl: 1, meta: 1, titulo: "Primeiro Sentir", desc: "Registou o seu humor pela primeira vez." },
+      { lvl: 2, meta: 3, titulo: "Constância Emocional", desc: "Completou 3 registos de humor." },
+      { lvl: 3, meta: 7, titulo: "Semana Consciente", desc: "Completou 7 registos de humor." },
+      { lvl: 4, meta: 14, titulo: "Mestre do Humor", desc: "Alcançou 14 registos no diário." },
+      { lvl: 5, meta: 30, titulo: "Autoconhecimento Pleno", desc: "30 registos de humor alcançados." },
+    ],
+  },
+  {
+    id: "missoes",
+    tipo: "missoes",
+    nomeBase: "Jornada de Hábitos",
+    icone: ListTodo,
+    cor: "text-orange-500",
+    bgCor: "bg-orange-50",
+    borderCor: "border-orange-100",
+    gradiente: "from-orange-400 to-[#E97451]",
+    niveis: [
+      { lvl: 1, meta: 1, titulo: "Primeiro Hábito", desc: "Concluiu a sua primeira missão diária." },
+      { lvl: 2, meta: 5, titulo: "Em Movimento", desc: "Completou 5 missões de autocuidado." },
+      { lvl: 3, meta: 15, titulo: "Rotina Saudável", desc: "Concluiu 15 atividades sugeridas." },
+      { lvl: 4, meta: 30, titulo: "Foco e Equilíbrio", desc: "30 hábitos cumpridos com sucesso." },
+      { lvl: 5, meta: 50, titulo: "Estilo de Vida", desc: "Alcançou 50 missões concluídas!" },
+    ],
+  },
+  {
+    id: "experiencia",
+    tipo: "nivelApp",
+    nomeBase: "Mente Iluminada",
+    icone: Zap,
+    cor: "text-amber-500",
+    bgCor: "bg-amber-50",
+    borderCor: "border-amber-100",
+    gradiente: "from-amber-400 to-orange-500",
+    niveis: [
+      { lvl: 1, meta: 2, titulo: "Despertar Zen", desc: "Alcançou o Nível 2 de jornada." },
+      { lvl: 2, meta: 5, titulo: "Mente Serena", desc: "Atingiu o Nível 5 de evolução." },
+      { lvl: 3, meta: 10, titulo: "Sabedoria Interior", desc: "Chegou ao Nível 10 no MindQuest." },
+      { lvl: 4, meta: 20, titulo: "Mestre da Calma", desc: "Alcançou a marca épica do Nível 20." },
+    ],
+  },
+  {
+    id: "terapia",
+    tipo: "terapeuta",
+    nomeBase: "Cuidado Partilhado",
+    icone: Stethoscope,
+    cor: "text-blue-500",
+    bgCor: "bg-blue-50",
+    borderCor: "border-blue-100",
+    gradiente: "from-blue-400 to-indigo-500",
+    niveis: [
+      { lvl: 1, meta: 1, titulo: "Ponte Clínica", desc: "Conectou a sua conta ao seu psicólogo." },
+      { lvl: 2, meta: 7, titulo: "Acompanhamento Ativo", desc: "7 registos acompanhados pelo terapeuta." },
+    ],
+  },
+];

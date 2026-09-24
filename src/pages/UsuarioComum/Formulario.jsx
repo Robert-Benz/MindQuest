@@ -6,98 +6,7 @@ import logo from "../../assets/LogoBrancoReduzido.png";
 
 import { db, auth } from "../../firebaseConfig";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-
-const questions = [
-  {
-    id: "movies",
-    category: "Filmes",
-    question: "Qual tipo de filme você mais gosta?",
-    options: [
-      "Ação", "Comédia", "Terror", "Romance", 
-      "Ficção Científica", "Drama", "Fantasia", "Documentário"
-    ]
-  },
-  {
-    id: "series",
-    category: "Séries",
-    question: "Qual gênero de série combina mais com você?",
-    options: [
-      "Suspense", "Crime", "Comédia", "Drama", 
-      "Fantasia", "Anime", "Reality Show"
-    ]
-  },
-    {
-    id: "livro",
-    category: "Livros",
-    question: "Qual tipo de livro você mais gosta de ler?",
-    options: [
-      "Romance", "Ficção Científica", "Suspense", "Desenvolvimento Pessoal", 
-      "Biografia", "Poesia", "HQ / Mangá", "Não costumo ler"
-    ]
-  },
-  {
-    id: "music",
-    category: "Música",
-    question: "Que tipo de música você mais gosta?",
-    options: [
-      "Pop", "Rock", "Rap", "Eletrônica", 
-      "MPB", "Sertanejo", "Jazz", "Clássica"
-    ]
-  },
-  {
-    id: "relax",
-    category: "Relaxamento",
-    question: "Quando você quer relaxar, prefere:",
-    options: [
-      "Assistir filmes ou séries", "Ouvir música", "Jogar", 
-      "Ler", "Fazer exercícios", "Descansar"
-    ]
-  },
-  {
-    id: "environment",
-    category: "Ambiente",
-    question: "Qual ambiente combina mais com você?",
-    options: [
-      "Lugar tranquilo", "Natureza", "Cidade movimentada", 
-      "Minha casa", "Eventos sociais"
-    ]
-  },
-  {
-    id: "hobbies",
-    category: "Hobbies",
-    question: "Como você costuma passar seu tempo livre?",
-    options: [
-      "Filmes e séries", "Jogos", "Esportes", 
-      "Tecnologia", "Música", "Aprender coisas novas"
-    ]
-  },
-  {
-    id: "activities",
-    category: "Atividades",
-    question: "Que tipo de atividade melhora seu humor?",
-    options: [
-      "Escutar música", "Caminhar", "Assistir algo", 
-      "Conversar", "Criar algo", "Relaxar"
-    ]
-  },
-  {
-    id: "social",
-    category: "Social",
-    question: "Você prefere experiências:",
-    options: [
-      "Sozinho", "Com amigos", "Com família", "Com alguém especial"
-    ]
-  },
-  {
-    id: "personality",
-    category: "Personalidade",
-    question: "Como você se define?",
-    options: [
-      "Criativo", "Aventureiro", "Calmo", 
-      "Curioso", "Competitivo", "Extrovertido"
-    ]
-  }
-];
+import { PERGUNTAS_FORMULARIO } from "../../utils/perguntasFormulario";
 
 export default function ProfileQuestionnaire() {
   const navigate = useNavigate();
@@ -105,8 +14,8 @@ export default function ProfileQuestionnaire() {
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const current = questions[currentQuestion];
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const current = PERGUNTAS_FORMULARIO[currentQuestion];
+  const progress = ((currentQuestion + 1) / PERGUNTAS_FORMULARIO.length) * 100;
 
   function selectOption(option) {
     setAnswers({
@@ -116,7 +25,7 @@ export default function ProfileQuestionnaire() {
   }
 
   function nextQuestion() {
-    if (currentQuestion < questions.length - 1) {
+    if (currentQuestion < PERGUNTAS_FORMULARIO.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
       saveProfile();
@@ -130,18 +39,16 @@ export default function ProfileQuestionnaire() {
   }
 
   async function saveProfile() {
-    // Evita chamadas duplicadas se já estiver salvando
     if (loading) return;
 
     const user = auth.currentUser;
-
     if (!user) {
       alert("Sessão expirada. Por favor, faça login novamente.");
       navigate("/login");
       return;
     }
 
-    setLoading(true); // <-- Ativa o carregamento para travar o botão
+    setLoading(true);
 
     try {
       const userFormRef = doc(db, "usuarios", user.uid, "respostasFormulario", "respostas");
@@ -152,31 +59,22 @@ export default function ProfileQuestionnaire() {
         dataPreenchimento: serverTimestamp(),
       });
 
-      console.log("Respostas salvas com sucesso!");
-      navigate("/menu", { state: { justCompletedForm: true } }); // <-- Redireciona para o menu após salvar
+      navigate("/menu", { state: { justCompletedForm: true } });
     } catch (error) {
       console.error("Erro ao salvar respostas no Firebase:", error);
       alert("Ocorreu um erro ao salvar suas preferências. Tente novamente.");
     } finally {
-      setLoading(false); // <-- Libera o estado mesmo em caso de erro
+      setLoading(false);
     }
   }
 
   return (
-    /* CONTAINER CENTRALIZADO NA TELA INTEIRA (SEM ESPAÇO VAZIO NO TOPO) */
     <div className="min-h-screen bg-[#FFFBF9] flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans antialiased">
-      
-      {/* CARD PRINCIPAL COM SOMBRA ELEGANTE E BORDAS ARREDONDADAS */}
       <div className="w-full max-w-lg bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_50px_rgba(233,116,81,0.08)] border border-orange-100/60 p-6 sm:p-10 flex flex-col justify-between my-auto">
         
-        {/* CABEÇALHO */}
         <div className="text-center space-y-2 mb-6">
           <div className="bg-[#E97451] w-14 h-14 rounded-2xl flex items-center justify-center mx-auto shadow-md shadow-orange-200/50 mb-3">
-            <img
-              src={logo}
-              alt="MindQuest"
-              className="w-9 h-auto object-contain"
-            />
+            <img src={logo} alt="MindQuest" className="w-9 h-auto object-contain" />
           </div>
 
           <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-snug">
@@ -188,10 +86,9 @@ export default function ProfileQuestionnaire() {
           </p>
         </div>
 
-        {/* BARRA DE PROGRESSO */}
         <div className="mb-6 space-y-2">
           <div className="flex justify-between items-center text-xs font-bold text-slate-400">
-            <span>Pergunta {currentQuestion + 1} de {questions.length}</span>
+            <span>Pergunta {currentQuestion + 1} de {PERGUNTAS_FORMULARIO.length}</span>
             <span className="text-[#E97451]">{Math.round(progress)}%</span>
           </div>
 
@@ -204,7 +101,6 @@ export default function ProfileQuestionnaire() {
           </div>
         </div>
 
-        {/* CONTEÚDO DA PERGUNTA ANIMAÇÃO */}
         <AnimatePresence mode="wait">
           <motion.div
             key={current.id}
@@ -223,7 +119,6 @@ export default function ProfileQuestionnaire() {
               </h2>
             </div>
 
-            {/* LISTA DE OPÇÕES (GRID RESPONSIVO E SELEÇÃO BONITA) */}
             <div className="grid grid-cols-1 gap-2.5 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar pt-1">
               {current.options.map((option) => {
                 const isSelected = answers[current.id] === option;
@@ -249,7 +144,6 @@ export default function ProfileQuestionnaire() {
           </motion.div>
         </AnimatePresence>
 
-        {/* RODAPÉ E BOTÕES DE NAVEGAÇÃO */}
         <div className="flex gap-3 mt-8 pt-4 border-t border-slate-100">
           <button
             type="button"
@@ -270,11 +164,11 @@ export default function ProfileQuestionnaire() {
             <span>
               {loading
                 ? "Salvando..."
-                : currentQuestion === questions.length - 1
+                : currentQuestion === PERGUNTAS_FORMULARIO.length - 1
                 ? "Finalizar"
                 : "Próximo"}
             </span>
-            {currentQuestion < questions.length - 1 && <ChevronRight size={16} />}
+            {currentQuestion < PERGUNTAS_FORMULARIO.length - 1 && <ChevronRight size={16} />}
           </button>
         </div>
 
