@@ -6,7 +6,7 @@ import {
   Square, ShieldCheck, Check, Calendar, Users,
   Eye, EyeOff
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -123,7 +123,18 @@ export default function Cadastro() {
   const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
 
   const [termosAceitos, setTermosAceitos] = useState(false);
-  const [loading, setLoading] = useState(false);
+
+  // Estados para a Modal de Confirmação de Código
+  const [modalCodigo, setModalCodigo] = useState(false);
+  const [codigo, setCodigo] = useState(["", "", "", "", "", ""]);
+  const [erroCodigo, setErroCodigo] = useState("");
+  const [loadingModal, setLoadingModal] = useState(false);
+
+  // Estado temporário para armazenar dados antes de criar a conta
+  const [dadosCadastroPendente, setDadosCadastroPendente] = useState(null);
+
+  const CODIGO_MOCKADO = "123456";
+  const codigoCompleto = codigo.every((digit) => digit !== "");
 
   const opcoesGenero = [
     { value: "feminino", label: "Feminino" },
@@ -133,7 +144,7 @@ export default function Cadastro() {
     { value: "prefiro_nao_informar", label: "Prefiro não informar" }
   ];
 
-  const handleCadastro = async (e) => {
+  const handleCadastro = (e) => {
     e.preventDefault();
 
     const emailLimpo = email.trim().toLowerCase();
@@ -175,23 +186,71 @@ export default function Cadastro() {
       return;
     }
 
-    setLoading(true);
+    // Armazena dados temporários e abre a modal sem salvar na base de dados
+    setDadosCadastroPendente({
+      nome,
+      email: emailLimpo,
+      senha,
+      dataNascimento,
+      genero
+    });
+
+    setCodigo(["", "", "", "", "", ""]);
+    setErroCodigo("");
+    setModalCodigo(true);
+    toast.info("Código de verificação enviado para seu e-mail!");
+  };
+
+  // Funções de manipulação do Código de Verificação
+  const handleCodigoChange = (value, index) => {
+    if (!/^\d*$/.test(value)) return;
+
+    const novoCodigo = [...codigo];
+    novoCodigo[index] = value;
+    setCodigo(novoCodigo);
+    setErroCodigo("");
+
+    if (value && index < 5) {
+      document.getElementById(`codigo-${index + 1}`)?.focus();
+    }
+  };
+
+  const handleReenviarCodigo = () => {
+    toast.success("Código de verificação reenviado para o seu e-mail!");
+  };
+
+  // CONFIRMAÇÃO DO CÓDIGO E CRIAÇÃO REAL DA CONTA NO FIREBASE
+  const handleConfirmarCodigo = async () => {
+    const codigoDigitado = codigo.join("");
+
+    if (codigoDigitado !== CODIGO_MOCKADO) {
+      setErroCodigo("Código inválido. Tente novamente.");
+      return;
+    }
+
+    setErroCodigo("");
+    setLoadingModal(true);
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, emailLimpo, senha);
+      const { nome, email, senha, dataNascimento, genero } = dadosCadastroPendente;
+
+      // 1. Cria conta no Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
       const user = userCredential.user;
 
+      await updateProfile(user, { displayName: nome });
+
+      // Gera código único para identificação do paciente
       const caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
       let codigoUnico = "PAC-";
       for (let i = 0; i < 5; i++) {
         codigoUnico += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
       }
 
-      await updateProfile(user, { displayName: nome });
-
+      // 2. Grava o documento no Firestore
       await setDoc(doc(db, "usuarios", user.uid), {
         nome,
-        email: emailLimpo,
+        email,
         dataNascimento,
         genero,
         xp: 0,
@@ -200,25 +259,28 @@ export default function Cadastro() {
         criadoEm: new Date().toISOString(),
         tipoPerfil: "usuario",
         codigoUnico,
-        temaEquipado: "default"     
+        temaEquipado: "default",
+        emailVerificado: true
       });
 
-      toast.success("Conta criada com sucesso! Bem-vindo ao MindQuest.");
-      navigate("/menu"); 
-      
+      toast.success("E-mail verificado e conta criada com sucesso! Bem-vindo ao MindQuest.");
+      setModalCodigo(false);
+      setDadosCadastroPendente(null);
+      navigate("/menu");
+
     } catch (error) {
       console.error(error);
       if (error.code === "auth/email-already-in-use") {
-        toast.error("Este e-mail já está em uso.");
+        setErroCodigo("Este e-mail já está em uso por outra conta.");
       } else if (error.code === "auth/invalid-email") {
-        toast.error("E-mail inválido.");
+        setErroCodigo("E-mail inválido.");
       } else if (error.code === "auth/weak-password") {
-        toast.error("A senha deve ter pelo menos 6 caracteres.");
+        setErroCodigo("A senha deve ter pelo menos 6 caracteres.");
       } else {
-        toast.error("Erro ao criar conta. Tente novamente.");
+        setErroCodigo("Erro ao criar conta. Tente novamente.");
       }
     } finally {
-      setLoading(false);
+      setLoadingModal(false);
     }
   };
 
@@ -417,16 +479,9 @@ export default function Cadastro() {
             {/* Botão de Submissão */}
             <button 
               type="submit"
-              disabled={loading}
               className="w-full py-3 bg-[#E97451] hover:bg-[#C06043] text-white rounded-xl font-bold text-xs shadow-md shadow-orange-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:active:scale-100 cursor-pointer"
             >
-              {loading ? (
-                <Sparkles className="size-4 animate-spin" />
-              ) : (
-                <>
-                  Concluir Cadastro e Iniciar <ChevronRight size={16} />
-                </>
-              )}
+              Verificar E-mail e Prosseguir <ChevronRight size={16} />
             </button>
           </form>
         </motion.div>
@@ -442,6 +497,91 @@ export default function Cadastro() {
         </p>
 
       </div>
+
+      {/* MODAL DE CONFIRMAÇÃO DE CÓDIGO */}
+      <AnimatePresence>
+        {modalCodigo && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full text-center shadow-2xl border border-orange-100 relative"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setModalCodigo(false);
+                  setDadosCadastroPendente(null);
+                }}
+                className="absolute top-5 left-5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <ArrowLeft size={18} />
+              </button>
+
+              <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <Mail className="text-[#E97451] size-7" />
+              </div>
+
+              <h2 className="text-xl font-black text-slate-900 tracking-tight mb-1">
+                Confirmar E-mail
+              </h2>
+
+              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                Digite o código de 6 dígitos enviado para <br />
+                <strong className="text-slate-700">{email}</strong>
+              </p>
+
+              {/* Inputs dos 6 Dígitos */}
+              <div className="flex justify-center gap-2 mb-4">
+                {codigo.map((digit, index) => (
+                  <input
+                    key={index}
+                    id={`codigo-${index}`}
+                    type="text"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleCodigoChange(e.target.value, index)}
+                    className="w-10 h-12 text-center text-lg font-bold rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-white text-slate-800 transition-all"
+                  />
+                ))}
+              </div>
+
+              {erroCodigo && (
+                <p className="text-rose-500 text-xs mb-4 font-semibold">
+                  {erroCodigo}
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={handleConfirmarCodigo}
+                disabled={!codigoCompleto || loadingModal}
+                className={`w-full py-3 rounded-xl font-bold text-xs text-white transition-all shadow-md flex items-center justify-center gap-2 ${
+                  !codigoCompleto || loadingModal
+                    ? "bg-slate-300 cursor-not-allowed shadow-none"
+                    : "bg-[#E97451] hover:bg-[#C06043] shadow-orange-500/20 active:scale-95 cursor-pointer"
+                }`}
+              >
+                {loadingModal ? (
+                  <Sparkles className="size-4 animate-spin" />
+                ) : (
+                  "Confirmar e Criar Conta"
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleReenviarCodigo}
+                className="mt-4 text-xs font-semibold text-[#E97451] hover:underline block mx-auto cursor-pointer"
+              >
+                Reenviar código
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
