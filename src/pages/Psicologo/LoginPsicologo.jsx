@@ -7,9 +7,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
 import { 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword 
+  createUserWithEmailAndPassword,
+  signOut
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import logoReduzido from "../../assets/LogoPessegoReduzido.png";
 
@@ -32,7 +33,22 @@ export default function LoginPsicologo() {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, senha);
+        // Autentica o usuário
+        const userCredential = await signInWithEmailAndPassword(auth, email, senha);
+        const user = userCredential.user;
+
+        // Validação: Verifica se o UID existe na coleção de psicólogos
+        const psicologoDocRef = doc(db, "psicologos", user.uid);
+        const psicologoSnap = await getDoc(psicologoDocRef);
+
+        if (!psicologoSnap.exists()) {
+          // Se não existir, é uma conta de paciente tentando logar aqui
+          await signOut(auth);
+          toast.error("Acesso negado: Esta conta não pertence a um psicólogo cadastrado.");
+          setLoading(false);
+          return;
+        }
+
         toast.success("Login realizado com sucesso!");
         navigate("/menuPsicologo");
       } else {
@@ -61,7 +77,7 @@ export default function LoginPsicologo() {
         });
 
         toast.success("Conta profissional criada com sucesso!");
-        navigate("/painel-psicologo");
+        navigate("/menuPsicologo");
       }
     } catch (error) {
       console.error(error);

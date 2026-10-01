@@ -1,18 +1,31 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ListTodo, Sparkles, Trash2, CheckCircle2, Circle, CalendarHeart, RefreshCw, Clock, Zap 
+import { 
+  ListTodo, Sparkles, Trash2, CheckCircle2, Circle, 
+  CalendarHeart, RefreshCw, Clock, Zap, Coins 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, limit, getDoc, increment 
+import { 
+  collection, addDoc, getDocs, updateDoc, deleteDoc, 
+  doc, query, orderBy, limit, getDoc, increment, where 
 } from "firebase/firestore";
 
 import { toast } from "sonner";
 import BottomNav from "../../components/BottomNav";
 import HeaderUsuario from "../../components/HeaderUsuario";
 import { gerarAtividadesPersonalizadas } from "../../services/aiService";
+
+// Obtém a data local de hoje no formato YYYY-MM-DD
+const getDataHojeFormatada = () => {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+};
 
 export default function GerenciarAtividades() {
   const navigate = useNavigate();
@@ -28,35 +41,18 @@ export default function GerenciarAtividades() {
         return;
       }
       setUserUid(user.uid);
-      await carregarAtividades(user.uid);
+      await carregarAtividadesDoDia(user.uid);
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  const carregarAtividades = async (uid) => {
-    try {
-      const q = query(
-        collection(db, "usuarios", uid, "atividades"), 
-        orderBy("criadoEm", "desc")
-      );
-      const querySnapshot = await getDocs(q);
-      const lista = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setAtividades(lista);
-    } catch (error) {
-      console.error("Erro ao buscar atividades:", error);
-      toast.error("Não foi possível carregar as atividades.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGerarComIA = async () => {
-    const uid = userUid || auth.currentUser?.uid;
-    if (!uid) return;
+  // Função central para geração de 3 missões com a IA
+  const executarGeracaoComIA = async (uid, titulosExistentes = []) => {
+    if (gerandoIA) return;
     setGerandoIA(true);
 
     try {
-      // 1. Dados do perfil do usuário
+      // 1. Dados cadastrais do usuário
       const userSnap = await getDoc(doc(db, "usuarios", uid));
       const dadosUsuario = userSnap.exists() ? userSnap.data() : {};
 
@@ -66,19 +62,19 @@ export default function GerenciarAtividades() {
       );
       const ultimoHumor = humorSnap.empty ? { humor: "Equilibrado", emoji: "🙂" } : humorSnap.docs[0].data();
 
-      // 3. Títulos das tarefas atuais para a IA não sugerir repetidas
-      const titulosJaAdicionados = atividades.map(a => a.titulo || a.texto).filter(Boolean);
-
-      // 4. Chamada à função da Raíssa
+      // 3. Chamada ao serviço de IA
       const sugestoes = await gerarAtividadesPersonalizadas(
         dadosUsuario, 
         ultimoHumor, 
-        titulosJaAdicionados
+        titulosExistentes
       );
 
-      // 5. Salva as missões retornadas no Firestore
+      // 4. Salva exatamente 3 missões diárias com dataReferencia
+      const hojeStr = getDataHojeFormatada();
+      const loteTres = (sugestoes || []).slice(0, 3);
       const novasSalvas = [];
-      for (const item of sugestoes) {
+
+      for (const item of loteTres) {
         const novaMissao = {
           titulo: item.titulo,
           descricao: item.descricao,
@@ -86,14 +82,15 @@ export default function GerenciarAtividades() {
           tempoEstimado: item.tempoEstimado || "10 min",
           xp: Number(item.xp) || 10,
           concluida: false,
+          dataReferencia: hojeStr,
           criadoEm: new Date().toISOString()
         };
         const refDoc = await addDoc(collection(db, "usuarios", uid, "atividades"), novaMissao);
         novasSalvas.push({ id: refDoc.id, ...novaMissao });
       }
 
-      setAtividades(prev => [...novasSalvas, ...prev]);
-      toast.success("Novas missões geradas com sucesso! ✨");
+      setAtividades(novasSalvas);
+      toast.success("Missões do dia preparadas! 🎯");
     } catch (error) {
       console.error("Erro ao gerar missões:", error);
       toast.error("Não foi possível gerar novas missões.");
@@ -102,11 +99,43 @@ export default function GerenciarAtividades() {
     }
   };
 
+  // Carrega apenas as missões de hoje (sem orderBy no Firebase para evitar erro de índice composto)
+  const carregarAtividadesDoDia = async (uid) => {
+    try {
+      const hojeStr = getDataHojeFormatada();
+      
+      const q = query(
+        collection(db, "usuarios", uid, "atividades"),
+        where("dataReferencia", "==", hojeStr)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const lista = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Ordenação local em memória por horário de criação
+      lista.sort((a, b) => String(a.criadoEm || "").localeCompare(String(b.criadoEm || "")));
+
+      // Se ainda não existirem missões criadas hoje, gera automaticamente via IA
+      if (lista.length === 0) {
+        await executarGeracaoComIA(uid, []);
+      } else {
+        setAtividades(lista);
+      }
+    } catch (error) {
+      console.error("Erro ao procurar atividades do dia:", error);
+      toast.error("Erro ao carregar atividades de hoje.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleToggle = async (atividade) => {
     const uid = userUid || auth.currentUser?.uid;
     if (!uid) return;
 
     const novoStatus = !atividade.concluida;
+    const valorMoedas = 10;
+    const valorXP = Number(atividade.xp) || 10;
 
     setAtividades(prev => prev.map(a => 
       a.id === atividade.id ? { ...a, concluida: novoStatus } : a
@@ -118,16 +147,22 @@ export default function GerenciarAtividades() {
         concluidaEm: novoStatus ? new Date().toISOString() : null
       });
 
-      if (novoStatus && atividade.xp) {
+      if (novoStatus) {
         await updateDoc(doc(db, "usuarios", uid), {
-          xp: increment(atividade.xp)
+          xp: increment(valorXP),
+          moedas: increment(valorMoedas)
         });
-        toast.success(`Concluído! +${atividade.xp} XP ganhos 🎉`);
+        toast.success(`Concluído! +${valorXP} XP e +${valorMoedas} Moedas 🪙`);
+      } else {
+        await updateDoc(doc(db, "usuarios", uid), {
+          xp: increment(-valorXP),
+          moedas: increment(-valorMoedas)
+        });
       }
     } catch (error) {
       console.error(error);
       toast.error("Erro ao atualizar status.");
-      carregarAtividades(uid);
+      carregarAtividadesDoDia(uid);
     }
   };
 
@@ -151,7 +186,7 @@ export default function GerenciarAtividades() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FFFBF9] flex items-center justify-center">
-        <Sparkles className="text-orange-400 size-8 animate-pulse" />
+        <Sparkles className="text-[var(--primary)] size-8 animate-spin" />
       </div>
     );
   }
@@ -160,31 +195,36 @@ export default function GerenciarAtividades() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff5f0_0%,_#fffbf9_38%,_#fffaf7_100%)] p-4 md:p-8 text-slate-800 antialiased font-sans pb-32">
       
       <HeaderUsuario />
+      
       <div className="max-w-xl mx-auto space-y-6">
+        
         {/* Resumo Diário */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden bg-white rounded-[2.75rem] border border-white shadow-xl shadow-orange-900/5 p-7 md:p-9 text-center"
+          className="relative overflow-hidden bg-white rounded-[2.75rem] border border-white shadow-xl shadow-slate-900/5 p-7 md:p-9 text-center"
         >
-          <div className="relative size-20 mx-auto mb-4 rounded-[1.75rem] bg-gradient-to-br from-orange-300 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20 text-white">
+          <div 
+            style={{ backgroundColor: "var(--primary)" }}
+            className="relative size-20 mx-auto mb-4 rounded-[1.75rem] flex items-center justify-center shadow-lg shadow-slate-900/5 text-white"
+          >
             <CalendarHeart size={36} className="fill-white/20" />
           </div>
 
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Missões do Dia</h1>
-          <p className="text-xs text-slate-500 mt-1 mb-6">Atividades personalizadas para o seu bem-estar.</p>
+          <p className="text-xs text-slate-500 mt-1 mb-6">Complete as 3 metas diárias para ganhar XP e Moedas.</p>
 
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-left">
             <div className="flex justify-between items-end mb-3">
               <div>
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Progresso do Dia</span>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Metas Diárias</span>
                 <span className="text-sm font-bold text-slate-700">{concluidas} de {total} concluídas</span>
               </div>
-              <span className="text-2xl font-black text-orange-500">{progresso}%</span>
+              <span className="text-2xl font-black text-[var(--primary)]">{progresso}%</span>
             </div>
             <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-orange-400 to-[#E97451]"
+                className="h-full rounded-full bg-[var(--primary)]"
                 initial={{ width: 0 }}
                 animate={{ width: `${progresso}%` }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
@@ -193,22 +233,26 @@ export default function GerenciarAtividades() {
           </div>
         </motion.div>
 
-        {/* Botão de Geração */}
+        {/* Botão de Regeneração Manual */}
         <button
           type="button"
-          onClick={handleGerarComIA}
+          onClick={() => {
+            const titulos = atividades.map(a => a.titulo || a.texto).filter(Boolean);
+            executarGeracaoComIA(userUid, titulos);
+          }}
           disabled={gerandoIA}
-          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-400 to-[#E97451] hover:from-orange-500 hover:to-orange-600 text-white font-bold text-sm shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-75"
+          style={{ backgroundColor: "var(--primary)" }}
+          className="w-full py-4 px-6 rounded-2xl text-white font-bold text-sm shadow-lg shadow-slate-900/5 flex items-center justify-center gap-2.5 transition-all hover:opacity-90 active:scale-[0.99] cursor-pointer disabled:opacity-50"
         >
           {gerandoIA ? (
             <>
               <RefreshCw className="size-5 animate-spin" />
-              <span>Gerando sugestões...</span>
+              <span>Preparando sugestões...</span>
             </>
           ) : (
             <>
               <Sparkles className="size-5" />
-              <span>Sugerir Missões com IA</span>
+              <span>Gerar Missões de Hoje</span>
             </>
           )}
         </button>
@@ -216,14 +260,16 @@ export default function GerenciarAtividades() {
         {/* Lista de Atividades */}
         <div className="space-y-3">
           <AnimatePresence mode="popLayout">
-            {atividades.length === 0 ? (
+            {atividades.length === 0 && !gerandoIA ? (
               <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
                 className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-[2rem]"
               >
                 <ListTodo className="mx-auto size-10 text-slate-300 mb-3" />
-                <p className="text-sm font-bold text-slate-500">Nenhuma missão no momento</p>
-                <p className="text-[11px] text-slate-400 mt-1">Clique acima para receber sugestões de hábitos.</p>
+                <p className="text-sm font-bold text-slate-500">Sem missões ativas</p>
+                <p className="text-[11px] text-slate-400 mt-1">Clique no botão acima para gerar tarefas.</p>
               </motion.div>
             ) : (
               atividades.map((ativ) => (
@@ -236,7 +282,7 @@ export default function GerenciarAtividades() {
                   className={`p-4 rounded-2xl border transition-all ${
                     ativ.concluida 
                       ? "bg-slate-50 border-slate-100 opacity-60" 
-                      : "bg-white border-slate-100 shadow-sm hover:border-orange-200"
+                      : "bg-white border-slate-100 shadow-xs hover:border-[var(--primary-light)]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -248,13 +294,13 @@ export default function GerenciarAtividades() {
                         {ativ.concluida ? (
                           <CheckCircle2 size={22} className="text-emerald-500 fill-emerald-50" />
                         ) : (
-                          <Circle size={22} className="text-slate-300 hover:text-orange-400" />
+                          <Circle size={22} className="text-slate-300 hover:text-[var(--primary)]" />
                         )}
                       </div>
 
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[9px] font-black uppercase tracking-wider text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-[var(--primary)] bg-[var(--primary-light)] px-2 py-0.5 rounded-md">
                             {ativ.categoria || "Rotina"}
                           </span>
                           {ativ.tempoEstimado && (
@@ -267,9 +313,11 @@ export default function GerenciarAtividades() {
                               <Zap size={10} className="fill-amber-500 text-amber-500" /> +{ativ.xp} XP
                             </span>
                           )}
+                          <span className="text-[10px] text-[var(--primary)] bg-[var(--primary-light)] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-bold">
+                            <Coins size={10} className="fill-[var(--primary)] text-[var(--primary)]" /> +10 Moedas
+                          </span>
                         </div>
 
-                        {/* Suporta tanto o formato novo (titulo) quanto o antigo (texto) */}
                         <h3 className={`text-sm font-bold leading-tight ${
                           ativ.concluida ? "text-slate-400 line-through" : "text-slate-800"
                         }`}>

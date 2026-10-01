@@ -1,3 +1,114 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 1. Pêssego MindQuest (Tema Padrão) */
+:root,
+[data-theme="tema_padrao"],
+[data-theme="pessego"] {
+  --primary: #E97451;
+  --primary-light: rgba(233, 116, 81, 0.15);
+  --bg-primary: #FFFBF9;
+  --card-bg: #FFFFFF;
+  --accent-color: #E97451;
+  --accent-hover: #C06043;
+  --text-primary: #0F172A;
+  --text-muted: #64748B;
+  --border-color: #F1F5F9;
+}
+
+/* 2. Lavanda Zen */
+[data-theme="tema_lavanda"],
+[data-theme="lavanda"] {
+  --primary: #9333ea;
+  --primary-light: rgba(147, 51, 234, 0.15);
+  --bg-primary: #FAF5FF;
+  --card-bg: #FFFFFF;
+  --accent-color: #9333ea;
+  --accent-hover: #7e22ce;
+  --text-primary: #3B0764;
+  --text-muted: #7E22CE;
+  --border-color: #F3E8FF;
+}
+
+/* 3. Menta Fresca */
+[data-theme="tema_menta"],
+[data-theme="menta"] {
+  --primary: #059669;
+  --primary-light: rgba(5, 150, 105, 0.15);
+  --bg-primary: #F0FDF4;
+  --card-bg: #FFFFFF;
+  --accent-color: #059669;
+  --accent-hover: #047857;
+  --text-primary: #064E3B;
+  --text-muted: #047857;
+  --border-color: #DCFCE7;
+}
+
+/* 4. Oceano Profundo */
+[data-theme="tema_oceano"],
+[data-theme="oceano"] {
+  --primary: #0284c7;
+  --primary-light: rgba(2, 132, 199, 0.15);
+  --bg-primary: #F0F9FF;
+  --card-bg: #FFFFFF;
+  --accent-color: #0284c7;
+  --accent-hover: #0369a1;
+  --text-primary: #0C4A6E;
+  --text-muted: #0369A1;
+  --border-color: #E0F2FE;
+}
+
+body {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body, 
+#root, 
+.min-h-screen {
+  background-color: var(--bg-primary) !important;
+}
+
+/* Força overrides de classes estáticas Tailwind para obedecer a variável do tema */
+button[class*="bg-orange-"], 
+button[class*="bg-[#E97451]"],
+button[class*="bg-[#FF9B7D]"],
+.button-primary,
+.primary-btn {
+  background-color: var(--accent-color) !important;
+  color: #ffffff !important;
+}
+
+button[class*="bg-orange-"]:hover, 
+button[class*="bg-[#E97451]"]:hover,
+.button-primary:hover,
+.primary-btn:hover {
+  background-color: var(--accent-hover) !important;
+}
+
+[class*="text-[#E97451]"],
+[class*="text-[#FF9B7D]"],
+[class*="text-orange-500"],
+[class*="text-orange-600"],
+.title {
+  color: var(--accent-color) !important;
+}
+
+[class*="border-[#E97451]"],
+[class*="border-orange-"],
+[class*="ring-[#E97451]"] {
+  border-color: var(--accent-color) !important;
+}
+
+svg[class*="text-[#E97451]"],
+svg[class*="text-orange-500"] {
+  color: var(--accent-color) !important;
+}
+
+div[class*="bg-[#E97451]"],
+div[class*="bg-orange-500"],
+span[class*="bg-[#E97451]"] {
+  background-color: var(--accent-color) !important;
+}

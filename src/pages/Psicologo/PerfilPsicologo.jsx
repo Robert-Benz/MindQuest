@@ -396,8 +396,8 @@ export default function PerfilPsicologo() {
                 <KeyRound size={17} className="text-slate-400" />
               </div>
               <div className="text-left">
-                <span className="block text-sm font-bold text-slate-700">Alterar Senha</span>
-                <span className="text-[10px] text-slate-400">Atualize sua senha de acesso</span>
+                <span className="block text-sm font-bold text-white">Alterar Senha</span>
+                <span className="text-[10px] text-white">Atualize sua senha de acesso</span>
               </div>
             </div>
             <ChevronRight size={16} className="text-slate-300" />

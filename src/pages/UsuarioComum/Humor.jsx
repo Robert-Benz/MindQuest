@@ -49,7 +49,6 @@ export default function Humor() {
   // =========================================================================
   useEffect(() => {
     if (registroParaEditar) {
-      // 1. Encontrar o índice do humor correto pelo emoji ou label
       const moodIndex = moods.findIndex(
         (m) => m.label === registroParaEditar.humor || m.emoji === registroParaEditar.emoji
       );
@@ -57,7 +56,6 @@ export default function Humor() {
         setSelectedMood(moodIndex);
       }
 
-      // 2. Encontrar o clima
       if (registroParaEditar.clima?.condicao) {
         const climaIndex = climas.findIndex(
           (c) => c.label.toLowerCase() === registroParaEditar.clima.condicao.toLowerCase()
@@ -67,7 +65,6 @@ export default function Humor() {
         }
       }
 
-      // 3. Carregar notas e fatores
       if (registroParaEditar.nota) {
         setNote(registroParaEditar.nota);
       }
@@ -116,14 +113,11 @@ export default function Humor() {
         tipoDia: tipoDeDia,
       };
 
-      // MODO EDIÇÃO: Atualiza o documento existente
       if (registroParaEditar?.docId) {
         const docRef = doc(db, "usuarios", user.uid, "registrosHumor", registroParaEditar.docId);
         await updateDoc(docRef, dadosDoHumor);
         toast.success("Registro atualizado com sucesso! ✨");
-      } 
-      // MODO CRIAÇÃO: Cria um novo documento e pontua XP
-      else {
+      } else {
         const humorRef = doc(collection(db, "usuarios", user.uid, "registrosHumor"));
         await setDoc(humorRef, {
           ...dadosDoHumor,
@@ -132,9 +126,12 @@ export default function Humor() {
         });
 
         const userRef = doc(db, "usuarios", user.uid);
-        await updateDoc(userRef, { xp: increment(10) });
+        await updateDoc(userRef, { 
+          xp: increment(10),
+          moedas: increment(15)
+        });
 
-        toast.success("Check-in registrado! +10 XP ✨");
+        toast.success("Check-in registrado! +10 XP e +15 Moedas 🪙");
       }
 
       navigate("/menu"); 
@@ -148,72 +145,88 @@ export default function Humor() {
   const currentMood = selectedMood !== null ? moods[selectedMood] : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-peach-100 via-white to-peach-300 flex items-center justify-center p-6 antialiased text-gray-800 pb-24">
+    <div className="min-h-screen bg-app-bg flex items-center justify-center p-3 sm:p-6 antialiased text-app-text pb-24 relative overflow-hidden transition-colors duration-300">
       
+      {/* Elementos decorativos (blobs) no fundo */}
+      <div className="absolute -top-20 -right-20 size-64 rounded-full bg-app-border blur-3xl opacity-50 pointer-events-none" />
+      <div className="absolute -bottom-20 -left-20 size-64 rounded-full bg-app-border blur-3xl opacity-50 pointer-events-none" />
+
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-xl bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-peach-300/40 border border-white"
+        className="w-full max-w-xl bg-app-card p-4 sm:p-8 md:p-10 rounded-[2.5rem] shadow-xl border border-app-border relative z-10"
       >
         <button 
           onClick={() => navigate(-1)} 
-          className="p-2 hover:bg-peach-100 rounded-full transition-colors cursor-pointer"
+          className="p-2 rounded-full transition-colors cursor-pointer text-app-primary hover:bg-app-border/50"
         >
-          <ArrowLeft className="size-6 text-peach-400" />
+          <ArrowLeft className="size-6" />
         </button>
 
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-extrabold text-peach-500 tracking-tight">
+        <div className="text-center mb-6 sm:mb-8">
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-app-primary">
             {registroParaEditar ? "Editar Sentir" : "Check-in do Sentir"}
           </h2>
-          <p className="text-gray-500 mt-2 text-lg">
+          <p className="text-app-muted mt-1 sm:mt-2 text-sm sm:text-lg">
             {registroParaEditar ? "Altere as informações do seu registro de hoje" : "Como está agora?"}
           </p>
         </div>
 
-        {/* Seleção de Humor com o Emote Selecionado Marcado */}
-        <div className="grid grid-cols-5 gap-3 mb-8">
-          {moods.map((mood, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => setSelectedMood(index)}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-3xl border-2 transition-all duration-200 cursor-pointer
-              ${selectedMood === index ? `bg-peach-100 border-peach-300 scale-105 shadow-md ${mood.color}` : "bg-peach-50/70 border-transparent opacity-60 hover:opacity-100"}`}
-            >
-              <span className="text-3xl md:text-4xl">{mood.emoji}</span>
-              <span className="text-[10px] font-bold uppercase tracking-tighter truncate w-full text-center">{mood.label}</span>
-            </button>
-          ))}
+        {/* Seleção de Humor Corrigida para Mobile */}
+        <div className="grid grid-cols-5 gap-1.5 sm:gap-3 mb-8">
+          {moods.map((mood, index) => {
+            const isSelected = selectedMood === index;
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => setSelectedMood(index)}
+                className={`flex flex-col items-center justify-center gap-1 px-1 py-2.5 sm:p-3 rounded-2xl sm:rounded-3xl border-2 transition-all duration-200 cursor-pointer ${
+                  isSelected 
+                    ? `scale-105 shadow-md ${mood.color} bg-app-border/30 border-app-primary` 
+                    : "bg-app-bg border-transparent opacity-60 hover:opacity-100"
+                }`}
+              >
+                <span className="text-2xl sm:text-3xl md:text-4xl">{mood.emoji}</span>
+                <span className={`text-[9px] sm:text-xs font-bold uppercase tracking-tight text-center leading-tight w-full ${isSelected ? "text-app-primary" : "text-app-muted"}`}>
+                  {mood.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <AnimatePresence mode="wait">
           {currentMood && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
               
-              <div className="flex items-center gap-2 text-peach-500 font-semibold bg-peach-100 p-4 rounded-2xl border border-peach-200">
+              <div className="flex items-center gap-2 font-semibold p-4 rounded-2xl border bg-app-border/30 text-app-primary border-app-border">
                 <MessageCircle className="size-5 shrink-0" />
-                <p className="text-sm">{currentMood.question}</p>
+                <p className="text-xs sm:text-sm">{currentMood.question}</p>
               </div>
 
               {/* Pergunta do Clima */}
               <div className="space-y-3">
-                <label className="flex items-center gap-2 text-xs font-bold text-peach-400 uppercase ml-2 tracking-widest">
+                <label className="flex items-center gap-2 text-xs font-bold uppercase ml-2 tracking-widest text-app-primary">
                   Como está o clima lá fora?
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {climas.map((clima, index) => {
                     const Icone = clima.icon;
+                    const isSelected = selectedClima === index;
                     return (
                       <button
                         key={clima.id}
                         type="button"
                         onClick={() => setSelectedClima(index)}
-                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 transition-all cursor-pointer
-                        ${selectedClima === index ? "bg-peach-50 border-peach-400 shadow-md scale-105" : "bg-slate-50 border-transparent text-gray-400 hover:bg-peach-50/50"}`}
+                        className={`flex flex-col items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-2xl border-2 transition-all cursor-pointer ${
+                          isSelected 
+                            ? "shadow-md scale-105 bg-app-border/30 border-app-primary text-app-text" 
+                            : "bg-app-bg border-transparent text-app-muted hover:bg-app-border/50"
+                        }`}
                       >
-                        <Icone className={`size-6 ${selectedClima === index ? clima.cor : "text-gray-400"}`} />
-                        <span className={`text-[10px] font-bold ${selectedClima === index ? "text-slate-700" : "text-gray-400"}`}>{clima.label}</span>
+                        <Icone className={`size-5 sm:size-6 ${isSelected ? clima.cor : "text-app-muted"}`} />
+                        <span className={`text-[10px] sm:text-xs font-bold ${isSelected ? "text-app-text" : "text-app-muted"}`}>{clima.label}</span>
                       </button>
                     )
                   })}
@@ -225,26 +238,32 @@ export default function Humor() {
                 onChange={(e) => setNote(e.target.value)}
                 spellCheck={false}
                 placeholder="Quer detalhar mais algum ponto do seu dia?"
-                className="w-full h-24 p-5 bg-peach-50 border-none rounded-3xl focus:ring-2 focus:ring-peach-400 transition-all resize-none shadow-inner outline-none text-sm"
+                className="w-full h-24 p-4 sm:p-5 rounded-3xl transition-all resize-none shadow-inner outline-none text-xs sm:text-sm bg-app-bg text-app-text border border-transparent focus:border-app-primary focus:ring-1 focus:ring-app-primary placeholder:text-app-muted/70"
               />
 
               {/* Fatores Categorizados */}
               <div className="space-y-3">
-                <label className="flex items-center gap-2 text-xs font-bold text-peach-400 uppercase ml-2 tracking-widest">
+                <label className="flex items-center gap-2 text-xs font-bold uppercase ml-2 tracking-widest text-app-primary">
                   <Tag className="size-3" /> O que impactou o seu dia?
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {fatores.map((fator) => (
-                    <button
-                      key={fator}
-                      type="button"
-                      onClick={() => toggleFactor(fator)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all border cursor-pointer
-                      ${selectedFactors.includes(fator) ? "bg-peach-500 text-white border-peach-500 shadow-md" : "bg-peach-50 text-gray-500 border-peach-100 hover:border-peach-300"}`}
-                    >
-                      {fator}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                  {fatores.map((fator) => {
+                    const isSelected = selectedFactors.includes(fator);
+                    return (
+                      <button
+                        key={fator}
+                        type="button"
+                        onClick={() => toggleFactor(fator)}
+                        className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all border cursor-pointer ${
+                          isSelected 
+                            ? "text-white shadow-md bg-app-primary border-app-primary" 
+                            : "text-app-muted bg-app-bg border-app-border hover:border-app-primary/50"
+                        }`}
+                      >
+                        {fator}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -256,7 +275,7 @@ export default function Humor() {
           type="button"
           disabled={selectedMood === null || selectedClima === null}
           onClick={handleSave}
-          className="w-full mt-8 bg-peach-500 hover:bg-peach-400 text-white font-bold py-4 rounded-2xl shadow-lg shadow-peach-300 transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale active:scale-95 cursor-pointer"
+          className="w-full mt-8 text-white font-bold py-3.5 sm:py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale active:scale-95 cursor-pointer hover:opacity-90 bg-app-primary shadow-app-primary/40 text-sm sm:text-base"
         >
           {registroParaEditar ? "Atualizar Check-in" : "Concluir Check-in"}
           <ArrowRight className="size-5" />
