@@ -455,19 +455,22 @@ export default function Cadastro() {
                   </p>
                 </div>
                 
+
                 <div className="pt-1 border-t border-slate-200">
-                  <label className="flex items-center gap-2 cursor-pointer group w-fit">
-                    <button 
-                      type="button"
-                      onClick={() => setTermosAceitos(!termosAceitos)}
-                      className="shrink-0 outline-none transition-transform active:scale-90 cursor-pointer"
-                    >
+                  <label className="flex items-center gap-2.5 cursor-pointer group w-fit select-none">
+                    <input 
+                      type="checkbox"
+                      checked={termosAceitos}
+                      onChange={(e) => setTermosAceitos(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className="shrink-0 transition-transform active:scale-90">
                       {termosAceitos ? (
                         <CheckSquare className="size-5 text-emerald-500" />
                       ) : (
                         <Square className="size-5 text-slate-300 group-hover:text-emerald-400 transition-colors" />
                       )}
-                    </button>
+                    </div>
                     <span className={`text-[11px] font-bold transition-colors ${termosAceitos ? 'text-emerald-700' : 'text-slate-700 group-hover:text-slate-900'}`}>
                       Li e concordo com os Termos e consentimento de IA.
                     </span>

@@ -7,7 +7,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 
 // Importações dos nossos novos arquivos de erro
 import PopUpGenerico from "../../components/PopUpGenerico";
-import { mapearErroFirebase } from "../../utils/firebaseErrors";
+import { mapearErroFirebase } from "../../utils/fireBaseErrors";
 
 export default function Login() {
   const navigate = useNavigate();
