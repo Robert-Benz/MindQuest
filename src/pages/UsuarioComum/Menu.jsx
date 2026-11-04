@@ -1,24 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { 
-  Sparkles, ChevronRight, TrendingUp, 
-  Settings, Award, ShoppingBag, BarChart3, 
-  PartyPopper, X, Brain 
-} from "lucide-react";
+import { Sparkles, ChevronRight, TrendingUp, Settings, Award, ShoppingBag, BarChart3, PartyPopper, X, Brain } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logoReduzido from "../../assets/LogoPessegoReduzido.png";
 import BottomNav from "../../components/BottomNav";
 
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import { 
-  doc, collection, query, orderBy, 
-  onSnapshot, getDocs, getDoc, where 
-} from "firebase/firestore";
-import { gerarInsightDiario } from "../../services/aiService";
+import { doc, collection, query, orderBy, onSnapshot, getDocs, getDoc, where } from "firebase/firestore";
+import { geraInsightDiario } from "../../services/aiService";
 import { analiseSemanal } from "../../services/analiseHumorService";
 
-// Helper para obter variáveis do tema com fallback no Pêssego clássico (#E97451)
 const getThemeColor = (varName, fallbackHex) => `var(${varName}, ${fallbackHex})`;
 
 const LogoPrincipal = () => (
@@ -30,18 +22,18 @@ const LogoPrincipal = () => (
   </div>
 );
 
-const getIndiceSegundaFeira = (date) => {
+const getSegundaFeira = (date) => {
   const day = date.getDay();
   return day === 0 ? 6 : day - 1;
 };
 
-const getInicioDaSemanaAtual = () => {
-  const agora = new Date();
-  const diaSemana = agora.getDay();
-  const diasParaSubtrair = diaSemana === 0 ? 6 : diaSemana - 1;
+const getInicioSemana = () => {
+  const hoje = new Date();
+  const diaSemana = hoje.getDay();
+  const subtrairDias = diaSemana === 0 ? 6 : diaSemana - 1;
   
-  const segunda = new Date(agora);
-  segunda.setDate(agora.getDate() - diasParaSubtrair);
+  const segunda = new Date(hoje);
+  segunda.setDate(hoje.getDate() - subtrairDias);
   segunda.setHours(0, 0, 0, 0);
   
   return segunda;
@@ -62,7 +54,7 @@ export default function Menu() {
   const [userXP, setUserXP] = useState(0);
 
   const [insightIA, setInsightIA] = useState("");
-  const [carregandoInsight, setCarregandoInsight] = useState(false);
+  const [carregaInsight, setcarregaInsight] = useState(false);
 
   const [humorSemanal, setHumorSemanal] = useState([
     { dia: "Seg", nivel: 0, cor: "bg-slate-200" },
@@ -102,11 +94,13 @@ export default function Menu() {
 
       try {
         await user.getIdToken();
-        analiseSemanal(user.uid).then((resultado) => {
-          if (resultado?.gerouNova && resultado?.analise) {
-            setAvisoNovaAnalise(resultado.analise);
-          }
-        });
+        if (new Date().getDay() === 0) {
+          analiseSemanal(user.uid).then((resultado) => {
+            if (resultado?.gerouNova && resultado?.analise) {
+              setAvisoNovaAnalise(resultado.analise);
+            }
+          });
+        }
       } catch (authErr) {
         console.warn("Aguardando confirmação de sessão...", authErr);
       }
@@ -146,7 +140,7 @@ export default function Menu() {
         });
 
         const humorRef = collection(db, "usuarios", user.uid, "registrosHumor");
-        const inicioSemana = getInicioDaSemanaAtual();
+        const inicioSemana = getInicioSemana();
 
         const q = query(
           humorRef, 
@@ -156,7 +150,7 @@ export default function Menu() {
         const humorSnapshot = await getDocs(q);
 
         let humorDeHoje = null;
-        let jaRegistrouHoje = false;
+        let jaRegistrado = false;
 
         const hoje = new Date();
         const diaHoje = hoje.getDate();
@@ -185,7 +179,7 @@ export default function Menu() {
                   : new Date(reg.data);
 
               if (d >= inicioSemana) {
-                const diaIndex = getIndiceSegundaFeira(d);
+                const diaIndex = getSegundaFeira(d);
 
                 if (reg.nivel > novoGrafico[diaIndex].nivel) {
                   novoGrafico[diaIndex].nivel = reg.nivel;
@@ -198,7 +192,7 @@ export default function Menu() {
                   d.getFullYear() === anoHoje &&
                   !humorDeHoje
                 ) {
-                  jaRegistrouHoje = true;
+                  jaRegistrado = true;
                   humorDeHoje = reg;
                 }
               }
@@ -208,15 +202,15 @@ export default function Menu() {
 
         setHumorSemanal(novoGrafico);
         setUltimoHumor(humorDeHoje);
-        setRegistrouHoje(jaRegistrouHoje);
+        setRegistrouHoje(jaRegistrado);
 
-        if (hasCompletedForm && !jaRegistrouHoje && !location.state?.justCompletedForm) {
+        if (hasCompletedForm && !jaRegistrado && !location.state?.justCompletedForm) {
           setIsHumorModalOpen(true);
         } else {
           setIsHumorModalOpen(false);
         }
 
-        if (humorDeHoje && jaRegistrouHoje) {
+        if (humorDeHoje && jaRegistrado) {
           const formDocRef = doc(db, "usuarios", user.uid, "respostasFormulario", "respostas");
           const formSnap = await getDoc(formDocRef);
           const respostas = formSnap.exists() ? (formSnap.data().respostas || {}) : {};
@@ -230,11 +224,11 @@ export default function Menu() {
                    dataAtiv.getFullYear() === anoHoje;
           }).length;
 
-          setCarregandoInsight(true);
+          setcarregaInsight(true);
 
           let ignorar = false;
 
-          gerarInsightDiario(respostas, humorDeHoje, totalAtivHoje)
+          geraInsightDiario(respostas, humorDeHoje, totalAtivHoje)
             .then((res) => {
               if (!ignorar) setInsightIA(res);
             })
@@ -245,7 +239,7 @@ export default function Menu() {
               }
             })
             .finally(() => {
-              if (!ignorar) setCarregandoInsight(false);
+              if (!ignorar) setcarregaInsight(false);
             });
 
           return () => {
@@ -342,7 +336,7 @@ export default function Menu() {
               Painel de Evolução
             </p>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">
-              {registrouHoje && ultimoHumor ? `Você está ${ultimoHumor.humor}` : "Sua Jornada"}
+              {registrouHoje && ultimoHumor ? `Você está ${ultimoHumor.humor === 'Raiva' ? 'com Raiva' : ultimoHumor.humor}` : "Sua Jornada"}
             </h1>
           </div>
           <button 
@@ -380,7 +374,7 @@ export default function Menu() {
               <span style={{ color: getThemeColor('--primary', '#E97451') }} className="text-[10px] font-bold uppercase tracking-widest">MindQuest IA</span>
             </div>
 
-            {carregandoInsight ? (
+            {carregaInsight ? (
               <div className="space-y-2 animate-pulse">
                 <div className="h-3 bg-slate-200 rounded-full w-full"></div>
                 <div className="h-3 bg-slate-200 rounded-full w-5/6"></div>
@@ -639,7 +633,7 @@ export default function Menu() {
                 <span style={{ color: getThemeColor('--primary', '#E97451') }} className="text-[10px] font-black uppercase tracking-wider">Novo Relatório</span>
                 <h3 className="text-lg font-black leading-tight text-slate-800">Análise Emocional Pronta!</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  A IA avaliou os seus registros do dia anterior. Deseja ver os seus insights agora?
+                  A IA avaliou os seus registros do dia anterior. Deseja ver os seus insights hoje?
                 </p>
               </div>
 

@@ -6,26 +6,54 @@ import logo from "../../assets/LogoBrancoReduzido.png";
 
 import { db, auth } from "../../firebaseConfig";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { PERGUNTAS_FORMULARIO } from "../../utils/perguntasFormulario";
+import { perguntasFormulario } from "../../utils/perguntasFormulario";
 
-export default function ProfileQuestionnaire() {
+export default function questionario() {
   const navigate = useNavigate();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const current = PERGUNTAS_FORMULARIO[currentQuestion];
-  const progress = ((currentQuestion + 1) / PERGUNTAS_FORMULARIO.length) * 100;
+  const current = perguntasFormulario[currentQuestion];
+  const progress = ((currentQuestion + 1) / perguntasFormulario.length) * 100;
 
   function selectOption(option) {
-    setAnswers({
-      ...answers,
-      [current.id]: option
-    });
+    const isMultiple = current.multiple;
+    const currentAnswer = answers[current.id];
+
+    if (isMultiple) {
+      if (Array.isArray(currentAnswer)) {
+        if (currentAnswer.includes(option)) {
+          // Se já tem, remove (desmarca)
+          setAnswers({
+            ...answers,
+            [current.id]: currentAnswer.filter((item) => item !== option),
+          });
+        } else {
+          // Se não tem, adiciona na lista
+          setAnswers({
+            ...answers,
+            [current.id]: [...currentAnswer, option],
+          });
+        }
+      } else {
+        // Primeira seleção múltipla
+        setAnswers({
+          ...answers,
+          [current.id]: [option],
+        });
+      }
+    } else {
+      // Seleção única normal
+      setAnswers({
+        ...answers,
+        [current.id]: option
+      });
+    }
   }
 
   function nextQuestion() {
-    if (currentQuestion < PERGUNTAS_FORMULARIO.length - 1) {
+    if (currentQuestion < perguntasFormulario.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
       saveProfile();
@@ -68,6 +96,12 @@ export default function ProfileQuestionnaire() {
     }
   }
 
+  // Verifica se o botão "Próximo" deve ficar desabilitado
+  const currentAnswer = answers[current.id];
+  const isNextDisabled = loading || 
+    !currentAnswer || 
+    (current.multiple && Array.isArray(currentAnswer) && currentAnswer.length === 0);
+
   return (
     <div className="min-h-screen bg-[#FFFBF9] flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans antialiased">
       <div className="w-full max-w-lg bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_50px_rgba(233,116,81,0.08)] border border-orange-100/60 p-6 sm:p-10 flex flex-col justify-between my-auto">
@@ -88,7 +122,7 @@ export default function ProfileQuestionnaire() {
 
         <div className="mb-6 space-y-2">
           <div className="flex justify-between items-center text-xs font-bold text-slate-400">
-            <span>Pergunta {currentQuestion + 1} de {PERGUNTAS_FORMULARIO.length}</span>
+            <span>Pergunta {currentQuestion + 1} de {perguntasFormulario.length}</span>
             <span className="text-[#E97451]">{Math.round(progress)}%</span>
           </div>
 
@@ -112,7 +146,7 @@ export default function ProfileQuestionnaire() {
           >
             <div>
               <span className="inline-block text-[11px] font-extrabold uppercase tracking-widest text-[#E97451] bg-orange-50 px-3 py-1 rounded-full border border-orange-100/80 mb-2">
-                {current.category}
+                {current.category} {current.multiple && "(Múltipla escolha)"}
               </span>
               <h2 className="text-lg sm:text-xl font-bold text-slate-800 leading-snug">
                 {current.question}
@@ -121,7 +155,11 @@ export default function ProfileQuestionnaire() {
 
             <div className="grid grid-cols-1 gap-2.5 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar pt-1">
               {current.options.map((option) => {
-                const isSelected = answers[current.id] === option;
+                // Checagem visual para ver se a opção está ativa
+                const isSelected = current.multiple 
+                  ? Array.isArray(currentAnswer) && currentAnswer.includes(option)
+                  : currentAnswer === option;
+
                 return (
                   <button
                     key={option}
@@ -158,17 +196,17 @@ export default function ProfileQuestionnaire() {
           <button
             type="button"
             onClick={nextQuestion}
-            disabled={!answers[current.id] || loading}
+            disabled={isNextDisabled}
             className="flex-1 py-3.5 px-4 rounded-2xl bg-[#E97451] hover:bg-[#c05e41] text-white font-bold text-sm shadow-lg shadow-orange-500/20 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-1"
           >
             <span>
               {loading
                 ? "Salvando..."
-                : currentQuestion === PERGUNTAS_FORMULARIO.length - 1
+                : currentQuestion === perguntasFormulario.length - 1
                 ? "Finalizar"
                 : "Próximo"}
             </span>
-            {currentQuestion < PERGUNTAS_FORMULARIO.length - 1 && <ChevronRight size={16} />}
+            {currentQuestion < perguntasFormulario.length - 1 && <ChevronRight size={16} />}
           </button>
         </div>
 

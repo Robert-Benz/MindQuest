@@ -4,8 +4,8 @@ import ScrollToTop from "./components/ScrollToTop";
 
 import { ThemeProvider } from "./utils/tema.jsx";
 
-import Home  from "./pages/PaginasComuns/Home";
-import Senha from "./pages/PaginasComuns/Senha";
+import Home       from "./pages/PaginasComuns/Home";
+import ResetSenha from './pages/PaginasComuns/ResetSenha'; 
 
 // IMPORTS - USUÁRIO COMUM (PACIENTE)
 import Cadastro               from "./pages/UsuarioComum/Cadastro";
@@ -13,11 +13,9 @@ import Login                  from "./pages/UsuarioComum/Login";
 import Humor                  from "./pages/UsuarioComum/Humor";
 import Calendario             from "./pages/UsuarioComum/Calendario"; 
 import Perfil                 from "./pages/UsuarioComum/Perfil"; 
-import ResetPassword         from './pages/UsuarioComum/ResetPassword'; 
 import Conquistas             from "./pages/UsuarioComum/Conquistas";
 import Loja                   from "./pages/UsuarioComum/Loja";
 import GerenciarAtividades    from "./pages/UsuarioComum/GerenciarAtividades";
-import SalaSessao             from "./pages/PaginasComuns/SalaSessao";
 import Formulario             from "./pages/UsuarioComum/Formulario";
 import AnaliseHumor           from "./pages/UsuarioComum/analiseHumor";
 import Menu                   from "./pages/UsuarioComum/Menu";
@@ -39,18 +37,16 @@ function App() {
           {/* ROTAS DO PACIENTE */}
           <Route path="/" element={<Home />} />
           <Route path="/home" element={<Home />} />
-          <Route path="/cadastro" element={<Cadastro />} />
+          <Route path="/cadastro" element={<Cadastro />} />V
           <Route path="/login" element={<Login />} />
           <Route path="/humor" element={<Humor />} />
           <Route path="/calendario" element={<Calendario />} />
           <Route path="/menu" element={<Menu />} />
           <Route path="/perfil" element={<Perfil />} />
-          <Route path="/ResetPassword" element={<ResetPassword />} />
+          <Route path="/ResetSenha" element={<ResetSenha />} />
           <Route path="/conquistas" element={<Conquistas />} />
           <Route path="/loja" element={<Loja />} />
           <Route path="/atividades" element={<GerenciarAtividades />} />
-          <Route path="/salaSessao" element={<SalaSessao />} />
-          <Route path="/senha" element={<Senha />}/>
           <Route path="/formulario" element={<Formulario />}/>
           <Route path="/AnaliseHumor" element={<AnaliseHumor />} />
           

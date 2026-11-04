@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud, CloudSun } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
 import { collection, doc, setDoc, updateDoc, increment } from "firebase/firestore";
@@ -10,8 +10,8 @@ export default function Humor() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Dados recebidos do Calendário (se for edição)
-  const registroParaEditar = location.state?.registroParaEditar || null;
+  // Dados recebidos do Calendário em caso de edição
+  const edicaoRegistro = location.state?.edicaoRegistro || null;
 
   const [selectedMood, setSelectedMood] = useState(null);
   const [selectedClima, setSelectedClima] = useState(null); 
@@ -48,32 +48,32 @@ export default function Humor() {
   // CARREGAR INFORMAÇÕES DO REGISTRO RECEBIDO DO CALENDÁRIO
   // =========================================================================
   useEffect(() => {
-    if (registroParaEditar) {
+    if (edicaoRegistro) {
       const moodIndex = moods.findIndex(
-        (m) => m.label === registroParaEditar.humor || m.emoji === registroParaEditar.emoji
+        (m) => m.label === edicaoRegistro.humor || m.emoji === edicaoRegistro.emoji
       );
       if (moodIndex !== -1) {
         setSelectedMood(moodIndex);
       }
 
-      if (registroParaEditar.clima?.condicao) {
+      if (edicaoRegistro.clima?.condicao) {
         const climaIndex = climas.findIndex(
-          (c) => c.label.toLowerCase() === registroParaEditar.clima.condicao.toLowerCase()
+          (c) => c.label.toLowerCase() === edicaoRegistro.clima.condicao.toLowerCase()
         );
         if (climaIndex !== -1) {
           setSelectedClima(climaIndex);
         }
       }
 
-      if (registroParaEditar.nota) {
-        setNote(registroParaEditar.nota);
+      if (edicaoRegistro.nota) {
+        setNote(edicaoRegistro.nota);
       }
 
-      if (registroParaEditar.fatores && Array.isArray(registroParaEditar.fatores)) {
-        setSelectedFactors(registroParaEditar.fatores);
+      if (edicaoRegistro.fatores && Array.isArray(edicaoRegistro.fatores)) {
+        setSelectedFactors(edicaoRegistro.fatores);
       }
     }
-  }, [registroParaEditar]);
+  }, [edicaoRegistro]);
 
   const toggleFactor = (factor) => {
     setSelectedFactors((prev) =>
@@ -96,8 +96,8 @@ export default function Humor() {
 
       const hoje = new Date();
       const numeroDia = hoje.getDay(); 
-      const isFimDeSemana = numeroDia === 0 || numeroDia === 6;
-      const tipoDeDia = isFimDeSemana ? "Fim de Semana" : "Dia de Semana";
+      const fimDeSemana = numeroDia === 0 || numeroDia === 6;
+      const tipoDeDia = fimDeSemana ? "Fim de Semana" : "Dia de Semana";
 
       const climaMap = {
         condicao: climas[selectedClima].label 
@@ -113,8 +113,8 @@ export default function Humor() {
         tipoDia: tipoDeDia,
       };
 
-      if (registroParaEditar?.docId) {
-        const docRef = doc(db, "usuarios", user.uid, "registrosHumor", registroParaEditar.docId);
+      if (edicaoRegistro?.docId) {
+        const docRef = doc(db, "usuarios", user.uid, "registrosHumor", edicaoRegistro.docId);
         await updateDoc(docRef, dadosDoHumor);
         toast.success("Registro atualizado com sucesso! ✨");
       } else {
@@ -147,7 +147,6 @@ export default function Humor() {
   return (
     <div className="min-h-screen bg-app-bg flex items-center justify-center p-3 sm:p-6 antialiased text-app-text pb-24 relative overflow-hidden transition-colors duration-300">
       
-      {/* Elementos decorativos (blobs) no fundo */}
       <div className="absolute -top-20 -right-20 size-64 rounded-full bg-app-border blur-3xl opacity-50 pointer-events-none" />
       <div className="absolute -bottom-20 -left-20 size-64 rounded-full bg-app-border blur-3xl opacity-50 pointer-events-none" />
 
@@ -165,14 +164,14 @@ export default function Humor() {
 
         <div className="text-center mb-6 sm:mb-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-app-primary">
-            {registroParaEditar ? "Editar Sentir" : "Check-in do Sentir"}
+            {edicaoRegistro ? "Editar Sentir" : "Check-in do Sentir"}
           </h2>
           <p className="text-app-muted mt-1 sm:mt-2 text-sm sm:text-lg">
-            {registroParaEditar ? "Altere as informações do seu registro de hoje" : "Como está agora?"}
+            {edicaoRegistro ? "Altere as informações do seu registro de hoje" : "Como está agora?"}
           </p>
         </div>
 
-        {/* Seleção de Humor Corrigida para Mobile */}
+        {/* Seleção de Humor para Mobile */}
         <div className="grid grid-cols-5 gap-1.5 sm:gap-3 mb-8">
           {moods.map((mood, index) => {
             const isSelected = selectedMood === index;
@@ -200,15 +199,23 @@ export default function Humor() {
           {currentMood && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
               
-              <div className="flex items-center gap-2 font-semibold p-4 rounded-2xl border bg-app-border/30 text-app-primary border-app-border">
-                <MessageCircle className="size-5 shrink-0" />
-                <p className="text-xs sm:text-sm">{currentMood.question}</p>
+              {/* Textarea*/}
+              <div className="relative">
+                <MessageCircle className="absolute top-4 sm:top-5 left-4 sm:left-5 size-5 text-app-primary pointer-events-none" />
+                
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  spellCheck={false}
+                  placeholder={currentMood.question}
+                  className="w-full h-28 pt-4 sm:pt-5 pb-4 sm:pb-5 pl-11 sm:pl-12 pr-4 sm:pr-5 rounded-3xl transition-all resize-none shadow-inner outline-none text-xs sm:text-sm bg-app-bg text-app-text border border-app-border focus:border-app-primary focus:ring-1 focus:ring-app-primary placeholder:text-app-primary/60"
+                />
               </div>
 
-              {/* Pergunta do Clima */}
+               {/* Pergunta do Clima */}
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-xs font-bold uppercase ml-2 tracking-widest text-app-primary">
-                  Como está o clima lá fora?
+                  <CloudSun className="size-3" /> Como foi o clima lá fora?
                 </label>
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {climas.map((clima, index) => {
@@ -232,14 +239,6 @@ export default function Humor() {
                   })}
                 </div>
               </div>
-
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                spellCheck={false}
-                placeholder="Quer detalhar mais algum ponto do seu dia?"
-                className="w-full h-24 p-4 sm:p-5 rounded-3xl transition-all resize-none shadow-inner outline-none text-xs sm:text-sm bg-app-bg text-app-text border border-transparent focus:border-app-primary focus:ring-1 focus:ring-app-primary placeholder:text-app-muted/70"
-              />
 
               {/* Fatores Categorizados */}
               <div className="space-y-3">
@@ -277,7 +276,7 @@ export default function Humor() {
           onClick={handleSave}
           className="w-full mt-8 text-white font-bold py-3.5 sm:py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale active:scale-95 cursor-pointer hover:opacity-90 bg-app-primary shadow-app-primary/40 text-sm sm:text-base"
         >
-          {registroParaEditar ? "Atualizar Check-in" : "Concluir Check-in"}
+          {edicaoRegistro ? "Atualizar Check-in" : "Concluir Check-in"}
           <ArrowRight className="size-5" />
         </button>
       </motion.div>

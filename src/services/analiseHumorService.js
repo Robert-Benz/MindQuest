@@ -1,9 +1,9 @@
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
-import { gerarRelatorioSemanalIA } from "./aiService";
+import { geraRelatorioSemanal } from "./aiService";
 
 // Converte qualquer formato de data do Firestore/JS
-const converterParaData = (valor) => {
+const converteData = (valor) => {
   if (!valor) return null;
   if (typeof valor.toDate === "function") return valor.toDate();
   if (valor.seconds) return new Date(valor.seconds * 1000);
@@ -19,49 +19,70 @@ const formatarDataLocal = (d) => {
   return `${ano}-${mes}-${dia}`;
 };
 
+// Descobre qual é a semana do mês (ex: 1ª semana de Novembro)
+const rotuloSemanaMes = (data) => {
+  const dia = data.getDate();
+  const numeroSemana = Math.ceil(dia / 7);
+  const nomeMes = data.toLocaleDateString("pt-BR", { month: "long" });
+  // Capitaliza o mês
+  const mesFormatado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+  
+  return `${numeroSemana}ª semana de ${mesFormatado}`;
+};
+
 export async function analiseSemanal(uid) {
   try {
     const hoje = new Date();
+    
+    // Análise gerada apenas nos DOMINGOS
+    if (hoje.getDay() !== 0) {
+      console.log("[AnaliseHumorService] Hoje não é domingo. Nenhuma análise gerada.");
+      return { gerouNova: false, analise: null };
+    }
+
+    // Identificador único para a análise de hoje (ex: analise_2026-11-08)
     const docIdHoje = `analise_${formatarDataLocal(hoje)}`;
 
-    // 1. Verifica se a análise de hoje já foi gerada
+    // 1. Verifica se a análise desta semana/hoje já foi gerada
     const refAnalises = collection(db, "usuarios", uid, "analisesSemanais");
     const snapAnalises = await getDocs(refAnalises);
     const jaExisteHoje = snapAnalises.docs.some(d => d.id === docIdHoje);
 
     if (jaExisteHoje) {
-      console.log("[AnaliseHumorService] Análise de hoje já existe.");
+      console.log("[AnaliseHumorService] Análise desta semana já existe.");
       return { gerouNova: false, analise: null };
     }
 
-    // 2. Busca registros do dia anterior (ontem)
+    // 2. Define o intervalo dos últimos 7 dias (do domingo passado até agora)
+    const dataFim = new Date(hoje); // Momento atual
+    const dataInicio = new Date(hoje);
+    dataInicio.setDate(hoje.getDate() - 7); // 7 dias atrás
+
+    // 3. Busca todos os registros de humor do usuário
     const refHumor = collection(db, "usuarios", uid, "registrosHumor");
     const snapHumor = await getDocs(refHumor);
-    
-    const ontem = new Date(hoje);
-    ontem.setDate(hoje.getDate() - 1);
-    const dataOntemLocal = formatarDataLocal(ontem);
-
     const todosRegistros = snapHumor.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    const registosOntem = todosRegistros.filter(r => {
-      const d = converterParaData(r.data || r.criadoEm);
-      return d && formatarDataLocal(d) === dataOntemLocal;
+    // Filtra os registros que caem dentro dos últimos 7 dias
+    const registrosUltimaSemana = todosRegistros.filter(r => {
+      const d = converteData(r.data || r.criadoEm);
+      return d && d >= dataInicio && d <= dataFim;
     });
 
-    console.log(`[AnaliseHumorService] Buscando registros de ontem (${dataOntemLocal}):`, registosOntem);
+    console.log(`[AnaliseHumorService] Registros encontrados nos últimos 7 dias:`, registrosUltimaSemana.length);
 
-    // Se ontem não teve registro, não gera
-    if (registosOntem.length === 0) {
-      console.log("[AnaliseHumorService] Nenhum registro encontrado para ontem.");
+    // Se o usuário não fez nenhum registro nos últimos 7 dias, não gera análise
+    if (registrosUltimaSemana.length === 0) {
+      console.log("[AnaliseHumorService] Nenhum registro nos últimos 7 dias. Análise não gerada.");
       return { gerouNova: false, analise: null };
     }
 
-    // 3. Frequência e desempate
+    // 4. Processa estatísticas da semana (Humores e Fatores)
     const contagemHumor = {};
     const contagemTags = {};
+    const atividadesConcluidasSet = new Set();
 
-    registosOntem.forEach(r => {
+    registrosUltimaSemana.forEach(r => {
       const h = r.humor || "Neutro";
       contagemHumor[h] = (contagemHumor[h] || 0) + 1;
 
@@ -84,31 +105,33 @@ export async function analiseSemanal(uid) {
       emojiPredominante = "⚖️";
     } else {
       humorPredominante = maisFrequentes[0][0];
-      emojiPredominante = registosOntem.find(r => r.humor === humorPredominante)?.emoji || "🙂";
+      emojiPredominante = registrosUltimaSemana.find(r => r.humor === humorPredominante)?.emoji || "🙂";
     }
 
     const fatoresMaisComuns = Object.keys(contagemTags)
       .sort((a, b) => contagemTags[b] - contagemTags[a])
       .slice(0, 3);
 
-    // 4. Chamada da IA
+    // 5. Chamada da IA passando o consolidado dos 7 dias
     let feedbackIA = "";
     try {
-      feedbackIA = await gerarRelatorioSemanalIA({
-        totalRegistros: registosOntem.length,
+      feedbackIA = await geraRelatorioSemanal({
+        totalRegistros: registrosUltimaSemana.length,
         humorPredominante,
         fatoresMaisComuns,
         atividadesConcluidas: []
       });
     } catch {
-      feedbackIA = `No dia de ontem notou-se um estado de humor ${humorPredominante.toLowerCase()}. Respeite seus ciclos e acolha seus sentimentos.`;
+      feedbackIA = `Nesta semana seu humor predominante foi ${humorPredominante.toLowerCase()}. Respeite seus ciclos e acolha seus sentimentos.`;
     }
 
-    const dataRotulo = ontem.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
+    // Gera o rótulo baseado na semana do mês (ex: 2ª semana de Novembro)
+    const rotuloSemana = rotuloSemanaMes(hoje);
+
     const novaAnalise = {
       id: docIdHoje,
-      rotulo: `Análise do dia ${dataRotulo}`,
-      totalRegistros: registosOntem.length,
+      rotulo: rotuloSemana,
+      totalRegistros: registrosUltimaSemana.length,
       humorPredominante,
       emojiPredominante,
       fatoresMaisComuns,
@@ -117,11 +140,11 @@ export async function analiseSemanal(uid) {
     };
 
     await setDoc(doc(db, "usuarios", uid, "analisesSemanais", docIdHoje), novaAnalise);
-    console.log("[AnaliseHumorService] Análise gerada e gravada com sucesso:", novaAnalise);
+    console.log("[AnaliseHumorService] Análise semanal gerada e gravada com sucesso:", novaAnalise);
     
     return { gerouNova: true, analise: novaAnalise };
 
-  } catch (erro) {
+  } catch (erro) {   // Mantido apenas se houver estrutura de try/catch padrão
     console.error("[AnaliseHumorService] Erro:", erro);
     return { gerouNova: false, analise: null };
   }

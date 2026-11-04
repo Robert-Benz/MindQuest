@@ -1,25 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, Mail, Lock, User, 
-  Sparkles, ChevronRight, CheckSquare, 
-  Square, ShieldCheck, Check, Calendar, Users,
-  Eye, EyeOff
-} from "lucide-react";
+import { ArrowLeft, Mail, Lock, User, Sparkles, ChevronRight, CheckSquare, Square, ShieldCheck, Check, Calendar, Users,Eye, EyeOff, X} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import logoReduzido from "../../assets/LogoPessegoReduzido.png";
+import { textoTermos } from "../../utils/termos";
 
 // Validação de E-mail via Regex
-function validarEmail(email) {
+function validaEmail(email) {
   const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return regexEmail.test(email);
 }
 
-function validarDataNascimento(dataStr) {
+function validaDataNascimento(dataStr) {
   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) {
     return { valido: false, mensagem: "Data de nascimento incompleta." };
   }
@@ -122,6 +118,7 @@ export default function Cadastro() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
 
+  const [modalTermosLeitura, setModalTermosLeitura] = useState(false);
   const [termosAceitos, setTermosAceitos] = useState(false);
 
   // Estados para a Modal de Confirmação de Código
@@ -155,7 +152,7 @@ export default function Cadastro() {
       return;
     }
 
-    if (!validarEmail(emailLimpo)) {
+    if (!validaEmail(emailLimpo)) {
       toast.error("Informe um endereço de e-mail válido.");
       return;
     }
@@ -170,7 +167,7 @@ export default function Cadastro() {
       return;
     }
 
-    const validacaoData = validarDataNascimento(dataNascimento);
+    const validacaoData = validaDataNascimento(dataNascimento);
     if (!validacaoData.valido) {
       toast.error(validacaoData.mensagem);
       return;
@@ -438,23 +435,23 @@ export default function Cadastro() {
             {/* Termos de Consentimento e LGPD */}
             <div className="pt-1">
               <div className="flex flex-col gap-2 w-full p-3.5 rounded-2xl bg-slate-50 border border-slate-200 shadow-inner">
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
-                  <span className="text-xs font-black text-slate-800">Termos de Privacidade e LGPD</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
+                    <span className="text-xs font-black text-slate-800">Termos e LGPD</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalTermosLeitura(true)}
+                    className="text-[10px] font-bold text-[#E97451] hover:underline cursor-pointer"
+                  >
+                    Ler completo
+                  </button>
                 </div>
                 
-                <div className="h-20 overflow-y-auto custom-scrollbar text-[10px] text-slate-500/90 font-medium leading-relaxed pr-2 space-y-2 text-justify">
-                  <p>
-                    Declaro ter lido e aceito os Termos de Uso e a Política de Privacidade do MindQuest, consentindo com o tratamento de dados pessoais e sensíveis (Art. 7º e 8º da Lei nº 13.709/2018 - LGPD).
-                  </p>
-                  <p>
-                    Compreendo que os dados incluem registros contínuos de humor, diários e preferências. <strong>Autorizo o uso de Inteligência Artificial</strong> para processar esses dados e gerar insights personalizados e recomendações de bem-estar.
-                  </p>
-                  <p>
-                    As sugestões não substituem aconselhamento médico ou psicológico. Dados armazenados de forma criptografada.
-                  </p>
-                </div>
-                
+                <p className="text-[10px] text-slate-500/90 font-medium leading-relaxed text-justify">
+                  Ao se registrar, você consente com o tratamento de dados de saúde mental e o uso de Inteligência Artificial para gerar recomendações personalizadas conforme a LGPD.
+                </p>
 
                 <div className="pt-1 border-t border-slate-200">
                   <label className="flex items-center gap-2.5 cursor-pointer group w-fit select-none">
@@ -580,6 +577,57 @@ export default function Cadastro() {
               >
                 Reenviar código
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL DE LEITURA DOS TERMOS SEPARADOS */}
+      <AnimatePresence>
+        {modalTermosLeitura && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[2.5rem] p-6 md:p-8 max-w-lg w-full shadow-2xl border border-orange-100 relative flex flex-col max-h-[85vh]"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                    <ShieldCheck className="text-emerald-500 size-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-slate-900">Termos de Uso e LGPD</h2>
+                    <p className="text-[10px] text-slate-400">Documento Oficial MindQuest</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalTermosLeitura(false)}
+                  className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* O texto do arquivo separado entra aqui */}
+              <div className="overflow-y-auto custom-scrollbar pr-2">
+                {textoTermos}
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 mt-4 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTermosAceitos(true);
+                    setModalTermosLeitura(false);
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-xs text-white bg-[#E97451] hover:bg-[#C06043] transition-all shadow-md shadow-orange-500/20 active:scale-95 cursor-pointer"
+                >
+                  Concordar e Fechar
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

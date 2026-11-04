@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, BrainCircuit, Sparkles, Calendar, 
-  ChevronRight, Smile, X, Brain, Tag 
-} from "lucide-react";
+import { ArrowLeft, BrainCircuit, Sparkles, Calendar, ChevronRight, Smile, X, Brain, Tag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
@@ -11,7 +8,7 @@ import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { toast } from "sonner";
 import BottomNav from "../../components/BottomNav";
 
-export default function AnaliseHumor() {
+export default function analiseHumor() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [analises, setAnalises] = useState([]);
@@ -23,12 +20,12 @@ export default function AnaliseHumor() {
         navigate("/home");
         return;
       }
-      await carregarHistorico(user.uid);
+      await carregaHistorico(user.uid);
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  const carregarHistorico = async (uid) => {
+  const carregaHistorico = async (uid) => {
     try {
       const analiseRef = collection(db, "usuarios", uid, "analisesSemanais");
       const analiseSnap = await getDocs(query(analiseRef, orderBy("geradoEm", "desc")));
@@ -82,7 +79,7 @@ export default function AnaliseHumor() {
 
           <h1 className="text-2xl font-black text-app-text tracking-tight">Histórico de Análises</h1>
           <p className="text-xs text-app-muted mt-1">
-            Insights automáticos gerados pela IA sobre os seus registros emocionais.
+            As análises semanais reúnem o resumo dos seus registros de humor e são geradas automaticamente todos os domingos.
           </p>
         </motion.div>
 

@@ -1,4 +1,4 @@
-export const TEMAS_LOJA = [
+export const temasLoja = [
   {
     id: "tema_padrao",
     nome: "Pêssego MindQuest",

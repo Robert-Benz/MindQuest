@@ -45,10 +45,9 @@ export default function RecuperarSenha() {
     <div className="min-h-screen bg-gradient-to-br from-[#F5DACA] via-[#FFF4EF] to-[#ECC3A9] flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-4">
         
-        {/* Botão Voltar fora da caixa */}
         <button 
           type="button"
-          onClick={() => navigate("/login")} 
+          onClick={() => navigate(-1)} 
           className="flex items-center gap-2 text-sm font-semibold text-[#7A4E3A]/80 hover:text-[#E97451] transition-colors cursor-pointer"
         >
           <ArrowLeft size={16} /> Voltar para Login
@@ -88,7 +87,6 @@ export default function RecuperarSenha() {
               />
             </div>
 
-            {/* Feedback Visual de Sucesso ou Erro */}
             {mensagem.texto && (
               <motion.div 
                 initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}

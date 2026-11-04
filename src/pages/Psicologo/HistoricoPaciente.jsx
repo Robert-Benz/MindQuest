@@ -1,15 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { 
-  ArrowLeft, Clock, Activity, 
-  ShieldCheck, HeartPulse, FileText, Sparkles, Brain, Sun, Tag, ChevronRight, X
-} from "lucide-react";
+import { ArrowLeft, Clock, Activity, ShieldCheck, HeartPulse, FileText, Sparkles, Brain, Sun, Tag, ChevronRight, X} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db } from "../../firebaseConfig";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { toast } from "sonner";
 
-export default function HistoricoPaciente() {
+export default function historicoPaciente() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -29,7 +26,7 @@ export default function HistoricoPaciente() {
       return;
     }
 
-    const carregarDadosClinicos = async () => {
+    const carregaDadosPaciente = async () => {
       try {
         setLoading(true);
 
@@ -97,7 +94,7 @@ export default function HistoricoPaciente() {
       }
     };
 
-    carregarDadosClinicos();
+    carregaDadosPaciente();
   }, [pacienteUid, navigate]);
 
   if (loading) {

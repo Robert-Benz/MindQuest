@@ -1,29 +1,23 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  Sparkles, Users, Activity, ShieldCheck, Trash2, 
-  Clock, Search, UserPlus, X, Check, ChevronRight
-} from "lucide-react";
+import { Sparkles, Users, Activity, ShieldCheck, Trash2, Clock, Search, UserPlus, X, Check, ChevronRight} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import { 
-  collection, getDocs, doc, getDoc, setDoc, 
-  query, where 
-} from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, setDoc, query, where } from "firebase/firestore";
 import { toast } from "sonner";
 import logoReduzido from "../../assets/LogoPessegoReduzido.png";
 import BottomNavPsicologo from "../../components/BottomNavPsicologo";
 
-export default function MenuPsicologo() {
+export default function menuPsicologo() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [psicologoDados, setPsicologoDados] = useState({ nome: "", crp: "" });
 
   const [pacientes, setPacientes] = useState([]);
   const [termoBusca, setTermoBusca] = useState("");
-  const [mostrarModalAdicionar, setMostrarModalAdicionar] = useState(false);
-  const [codigoPacienteInput, setCodigoPacienteInput] = useState("");
+  const [modalAdicionar, setmodalAdicionar] = useState(false);
+  const [codigoPaciente, setcodigoPaciente] = useState("");
   const [vinculando, setVinculando] = useState(false);
 
   useEffect(() => {
@@ -63,7 +57,7 @@ export default function MenuPsicologo() {
 
   const handleVincularPaciente = async (e) => {
     e.preventDefault();
-    const codigoLimpo = codigoPacienteInput.trim().toUpperCase();
+    const codigoLimpo = codigoPaciente.trim().toUpperCase();
     if (!codigoLimpo) return;
 
     setVinculando(true);
@@ -107,8 +101,8 @@ export default function MenuPsicologo() {
 
       setPacientes((prev) => [novoPacienteItem, ...prev.filter((p) => p.id !== pacienteId)]);
       toast.success(`Paciente ${dadosPaciente.nome || ""} vinculado com sucesso!`);
-      setCodigoPacienteInput("");
-      setMostrarModalAdicionar(false);
+      setcodigoPaciente("");
+      setmodalAdicionar(false);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao vincular paciente.");
@@ -197,7 +191,7 @@ export default function MenuPsicologo() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Pesquisar por nome ou código (ex: MQ-992)..." 
+              placeholder="Pesquisar por nome ou código (ex: PAC-992)..." 
               value={termoBusca}
               onChange={(e) => setTermoBusca(e.target.value)}
               className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl shadow-sm outline-none text-sm focus:ring-2 focus:ring-orange-200 transition-all font-medium text-slate-700" 
@@ -206,7 +200,7 @@ export default function MenuPsicologo() {
 
           <button 
             type="button"
-            onClick={() => setMostrarModalAdicionar(!mostrarModalAdicionar)}
+            onClick={() => setmodalAdicionar(!modalAdicionar)}
             className="px-5 py-3.5 bg-[#E97451] hover:bg-[#C06043] text-white rounded-2xl shadow-md shadow-orange-500/20 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 active:scale-95 cursor-pointer"
           >
             <UserPlus size={16} /> Vincular
@@ -215,7 +209,7 @@ export default function MenuPsicologo() {
 
         {/* Modal de Vínculo */}
         <AnimatePresence>
-          {mostrarModalAdicionar && (
+          {modalAdicionar && (
             <motion.form 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -225,7 +219,7 @@ export default function MenuPsicologo() {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Vincular Paciente por Código</h3>
-                <button type="button" onClick={() => setMostrarModalAdicionar(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <button type="button" onClick={() => setmodalAdicionar(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
@@ -235,9 +229,9 @@ export default function MenuPsicologo() {
               <div className="flex gap-2">
                 <input 
                   type="text"
-                  placeholder="Ex: MQ-8K7F2"
-                  value={codigoPacienteInput}
-                  onChange={(e) => setCodigoPacienteInput(e.target.value)}
+                  placeholder="Ex: PAC-8K7F2"
+                  value={codigoPaciente}
+                  onChange={(e) => setcodigoPaciente(e.target.value)}
                   className="flex-1 p-3.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-orange-200"
                   required
                 />
@@ -301,7 +295,7 @@ export default function MenuPsicologo() {
 
                   <button 
                     type="button"
-                    onClick={() => navigate("/HistoricoPaciente", { state: { pacienteUid: p.id } })} 
+                    onClick={() => navigate("/historicoPaciente", { state: { pacienteUid: p.id } })} 
                     className="w-full py-3 px-4 rounded-xl bg-slate-50 hover:bg-orange-50 border border-slate-200 hover:border-orange-200 text-slate-700 hover:text-orange-600 text-xs font-bold transition-all flex items-center justify-between cursor-pointer group"
                   >
                     <div className="flex items-center gap-2">

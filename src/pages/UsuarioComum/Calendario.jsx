@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon, 
-  X, Edit3, Sun, Tag, Lock, Sparkles 
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Edit3, Sun, Tag, Lock, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { auth, db } from "../../firebaseConfig";
@@ -179,12 +176,10 @@ export default function Calendario() {
                             : "bg-app-bg/60 border border-app-border/40 text-app-muted/50 cursor-default"
                       }`}
                     >
-                      {/* Número do dia fixo no canto superior esquerdo */}
                       <span className={`absolute top-1 left-1.5 text-[9px] sm:text-[10px] leading-none ${ehHoje ? "font-black text-app-primary" : "text-app-muted"}`}>
                         {dia}
                       </span>
                       
-                      {/* Emoji ou sinal de + no centro do card */}
                       {registroDoDia ? (
                         <span className="text-xl sm:text-2xl drop-shadow-xs pt-1.5 sm:pt-2">{registroDoDia.emoji}</span>
                       ) : ehHoje ? (

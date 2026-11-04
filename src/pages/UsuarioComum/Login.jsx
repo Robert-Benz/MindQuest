@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import { auth } from "../../firebaseConfig";
 import { signInWithEmailAndPassword } from "firebase/auth";
 
-// Importações dos nossos novos arquivos de erro
 import PopUpGenerico from "../../components/PopUpGenerico";
 import { mapearErroFirebase } from "../../utils/fireBaseErrors";
 
@@ -15,7 +14,6 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   
-  // Novos estados para controlar o PopUp
   const [modalAberto, setModalAberto] = useState(false);
   const [mensagemErro, setMensagemErro] = useState("");
 
@@ -27,7 +25,6 @@ export default function Login() {
     } catch (error) {
       console.error("Erro ao entrar:", error.code);
       
-      // Captura o erro, traduz e abre o PopUp dinamicamente
       const mensagemTraduzida = mapearErroFirebase(error.code);
       setMensagemErro(mensagemTraduzida);
       setModalAberto(true);
@@ -37,10 +34,8 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5DACA] via-[#FFF4EF] to-[#ECC3A9] flex items-center justify-center p-6 relative">
       
-      {/* Contêiner centralizador que acomoda o botão e o card */}
       <div className="w-full max-w-md space-y-4">
         
-        {/* Botão posicionado acima da div principal */}
         <button 
           type="button"
           onClick={() => navigate("/home")} 
@@ -110,7 +105,7 @@ export default function Login() {
 
           <p className="text-center mt-6 text-sm text-[#9A6A58]">
           <button
-            onClick={() => navigate("/ResetPassword")}
+            onClick={() => navigate("/ResetSenha")}
             className="font-bold text-[#FF9B7D] hover:underline"
           >
             Esqueci a Senha
@@ -120,7 +115,6 @@ export default function Login() {
         </motion.div>
       </div>
 
-      {/* Renderização do PopUp Genérico */}
       <PopUpGenerico 
         isOpen={modalAberto} 
         onClose={() => setModalAberto(false)} 

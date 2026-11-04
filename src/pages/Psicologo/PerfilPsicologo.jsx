@@ -3,15 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { 
-  User, Mail, Camera, ShieldCheck, KeyRound, 
-  LogOut, Save, Sparkles, ChevronRight, X, Check, Pencil 
-} from "lucide-react";
+import { User, Mail, Camera, ShieldCheck, KeyRound, LogOut, Save, Sparkles, ChevronRight, X, Check, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
-import { 
-  onAuthStateChanged, signOut, updateEmail, updatePassword, 
-  EmailAuthProvider, reauthenticateWithCredential 
+import { onAuthStateChanged, signOut, updateEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential 
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
@@ -31,7 +26,7 @@ function EditableField({ icon: Icon, label, type = "text", editing, register, on
         </label>
         {editing && (
           <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider">
-            Editando
+            editar
           </span>
         )}
       </div>
@@ -83,14 +78,14 @@ function EditableField({ icon: Icon, label, type = "text", editing, register, on
   );
 }
 
-export default function PerfilPsicologo() {
+export default function perfilPsicologo() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
 
-  const [editandoNome, setEditandoNome] = useState(false);
-  const [editandoEmail, setEditandoEmail] = useState(false);
-  const [editandoCrp, setEditandoCrp] = useState(false);
+  const [editarNome, seteditarNome] = useState(false);
+  const [editarEmail, seteditarEmail] = useState(false);
+  const [editarCrp, seteditarCrp] = useState(false);
 
   const [fotoURL, setFotoURL] = useState(null);
   const [dadosOriginais, setDadosOriginais] = useState({ nome: "", email: "", crp: "" });
@@ -194,9 +189,9 @@ export default function PerfilPsicologo() {
         crp: data.crp.trim()
       });
 
-      setEditandoNome(false);
-      setEditandoEmail(false);
-      setEditandoCrp(false);
+      seteditarNome(false);
+      seteditarEmail(false);
+      seteditarCrp(false);
 
       toast.success("Perfil profissional atualizado com sucesso!");
     } catch (err) {
@@ -323,14 +318,14 @@ export default function PerfilPsicologo() {
             <EditableField 
               icon={User}
               label="Nome Completo"
-              editing={editandoNome}
+              editing={editarNome}
               register={register("nome")}
-              onEdit={() => setEditandoNome(true)}
+              onEdit={() => seteditarNome(true)}
               onCancel={() => {
                 setValue("nome", dadosOriginais.nome);
-                setEditandoNome(false);
+                seteditarNome(false);
               }}
-              onConfirm={() => setEditandoNome(false)}
+              onConfirm={() => seteditarNome(false)}
             />
             {errors.nome && <p className="text-xs text-red-400 ml-2 -mt-2">{errors.nome.message}</p>}
 
@@ -338,14 +333,14 @@ export default function PerfilPsicologo() {
               icon={Mail}
               label="E-mail de Acesso"
               type="email"
-              editing={editandoEmail}
+              editing={editarEmail}
               register={register("email")}
-              onEdit={() => setEditandoEmail(true)}
+              onEdit={() => seteditarEmail(true)}
               onCancel={() => {
                 setValue("email", dadosOriginais.email);
-                setEditandoEmail(false);
+                seteditarEmail(false);
               }}
-              onConfirm={() => setEditandoEmail(false)}
+              onConfirm={() => seteditarEmail(false)}
             />
             {errors.email && <p className="text-xs text-red-400 ml-2 -mt-2">{errors.email.message}</p>}
 

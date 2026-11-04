@@ -1,6 +1,6 @@
 import { Smile, ListTodo, Zap, Stethoscope } from "lucide-react";
 
-export const CONFIG_CONQUISTAS = [
+export const configConquistas = [
   {
     id: "humor",
     tipo: "humor",

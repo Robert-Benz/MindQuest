@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, Sparkles, Palette, Coins, 
-  Check, Lock, CheckCircle2 
-} from "lucide-react";
+import { ArrowLeft, Sparkles, Palette, Coins, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
@@ -12,9 +9,9 @@ import { toast } from "sonner";
 import HeaderUsuario from "../../components/HeaderUsuario";
 import BottomNav from "../../components/BottomNav";
 import { useTheme } from "../../utils/tema";
-import { TEMAS_LOJA } from "../../utils/itensLoja";
+import { temasLoja } from "../../utils/itensLoja";
 
-export default function Loja() {
+export default function loja() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [comprando, setComprando] = useState(false);
@@ -175,12 +172,12 @@ export default function Loja() {
               Paletas de Cores & Ambientes
             </span>
             <span className="text-[10px] font-bold text-app-primary">
-              {TEMAS_LOJA.length} disponíveis
+              {temasLoja.length} disponíveis
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {TEMAS_LOJA.map((item) => {
+            {temasLoja.map((item) => {
               const desbloqueado = usuarioData.itensDesbloqueados.includes(item.id);
               const equipado = usuarioData.temaAtivo === item.id;
 

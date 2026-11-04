@@ -1,26 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, ShieldCheck, Mail, Lock, User, Sparkles, LogIn, UserPlus, Eye, EyeOff 
-} from "lucide-react";
+import { ArrowLeft, ShieldCheck, Mail, Lock, User, Sparkles, LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  signOut
-} from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword,signOut} from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import logoReduzido from "../../assets/LogoPessegoReduzido.png";
 
 // Validação de formato CRP (2 dígitos da região + '/' + 4 a 6 dígitos do registro)
-function validarCRP(crpStr) {
+function validaCRP(crpStr) {
   const regexCRP = /^\d{2}\/\d{4,6}$/;
   return regexCRP.test(crpStr);
 }
 
-export default function LoginPsicologo() {
+export default function loginPsicologo() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
 
@@ -96,7 +90,7 @@ export default function LoginPsicologo() {
         return;
       }
 
-      if (!validarCRP(crp)) {
+      if (!validaCRP(crp)) {
         toast.error("Por favor, informe um CRP válido (Ex: 06/123456).");
         return;
       }
@@ -269,7 +263,7 @@ export default function LoginPsicologo() {
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                       <input 
                         type="text" 
-                        placeholder="Dr(a). Nome Sobrenome" 
+                        placeholder="Nome e Sobrenome" 
                         value={nome} 
                         onChange={(e) => setNome(e.target.value)} 
                         className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-peach-200 transition-all text-slate-700"
@@ -385,6 +379,27 @@ export default function LoginPsicologo() {
                 </>
               )}
             </button>
+
+            {/* BOTÃO DE ESQUECI A SENHA*/}
+            <AnimatePresence>
+              {isLogin && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="text-center pt-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => navigate("/ResetSenha")}
+                    className="text-xs font-bold text-slate-400 hover:text-[#E97451] hover:underline cursor-pointer transition-all"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
           </form>
 
         </motion.div>
