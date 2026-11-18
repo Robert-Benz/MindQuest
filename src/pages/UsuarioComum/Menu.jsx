@@ -94,13 +94,11 @@ export default function Menu() {
 
       try {
         await user.getIdToken();
-        if (new Date().getDay() === 0) {
-          analiseSemanal(user.uid).then((resultado) => {
-            if (resultado?.gerouNova && resultado?.analise) {
-              setAvisoNovaAnalise(resultado.analise);
-            }
-          });
-        }
+        analiseSemanal(user.uid).then((resultado) => {
+          if (resultado?.gerouNova && resultado?.analise) {
+            setAvisoNovaAnalise(resultado.analise);
+          }
+        });
       } catch (authErr) {
         console.warn("Aguardando confirmação de sessão...", authErr);
       }
@@ -633,7 +631,7 @@ export default function Menu() {
                 <span style={{ color: getThemeColor('--primary', '#E97451') }} className="text-[10px] font-black uppercase tracking-wider">Novo Relatório</span>
                 <h3 className="text-lg font-black leading-tight text-slate-800">Análise Emocional Pronta!</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  A IA avaliou os seus registros do dia anterior. Deseja ver os seus insights hoje?
+                  O seu resumo emocional da última semana já está disponível. Deseja conferir agora?
                 </p>
               </div>
 

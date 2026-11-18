@@ -127,10 +127,9 @@ export default function Cadastro() {
   const [erroCodigo, setErroCodigo] = useState("");
   const [loadingModal, setLoadingModal] = useState(false);
 
-  // Estado temporário para armazenar dados antes de criar a conta
   const [dadosCadastroPendente, setDadosCadastroPendente] = useState(null);
 
-  const CODIGO_MOCKADO = "123456";
+  const [codigoVerificacao, setcodigoVerificacao] = useState("");
   const codigoCompleto = codigo.every((digit) => digit !== "");
 
   const opcoesGenero = [
@@ -183,6 +182,9 @@ export default function Cadastro() {
       return;
     }
 
+    const codigoGerado = Math.floor(100000 + Math.random() * 900000).toString();
+    setcodigoVerificacao(codigoGerado);
+
     // Armazena dados temporários e abre a modal sem salvar na base de dados
     setDadosCadastroPendente({
       nome,
@@ -216,11 +218,11 @@ export default function Cadastro() {
     toast.success("Código de verificação reenviado para o seu e-mail!");
   };
 
-  // CONFIRMAÇÃO DO CÓDIGO E CRIAÇÃO REAL DA CONTA NO FIREBASE
+  // CONFIRMAÇÃO DO CÓDIGO E CRIAÇÃO DA CONTA NO FIREBASE
   const handleConfirmarCodigo = async () => {
     const codigoDigitado = codigo.join("");
 
-    if (codigoDigitado !== CODIGO_MOCKADO) {
+    if (codigoDigitado !== codigoVerificacao) {
       setErroCodigo("Código inválido. Tente novamente.");
       return;
     }

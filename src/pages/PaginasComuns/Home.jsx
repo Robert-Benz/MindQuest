@@ -6,7 +6,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-br from-[#fff8f5] via-white to-[#ffe8de] text-gray-800 antialiased flex flex-col justify-between select-none">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#fff8f5] via-white to-[#ffe8de] text-gray-800 antialiased flex flex-col justify-between select-none">
 
       {/* Orbes de fundo adaptativas */}
       <div className="pointer-events-none absolute -left-28 -top-28 h-[40vh] w-[40vh] max-w-[400px] max-h-[400px] rounded-full bg-[#ffd7c8]/50 blur-[90px]" />
