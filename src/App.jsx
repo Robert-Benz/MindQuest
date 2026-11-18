@@ -37,7 +37,7 @@ function App() {
           {/* ROTAS DO PACIENTE */}
           <Route path="/" element={<Home />} />
           <Route path="/home" element={<Home />} />
-          <Route path="/cadastro" element={<Cadastro />} />V
+          <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/login" element={<Login />} />
           <Route path="/humor" element={<Humor />} />
           <Route path="/calendario" element={<Calendario />} />

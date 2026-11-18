@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, LogIn } from "lucide-react";
 import { motion } from "framer-motion";
-import { auth } from "../../firebaseConfig";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth, db } from "../../firebaseConfig";
+import { signInWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
 
 import PopUpGenerico from "../../components/PopUpGenerico";
+import ModalVerificacaoEmail from "../../components/ModalVerificacaoEmail";
 import { mapearErroFirebase } from "../../utils/fireBaseErrors";
 
 export default function Login() {
@@ -16,11 +18,20 @@ export default function Login() {
   
   const [modalAberto, setModalAberto] = useState(false);
   const [mensagemErro, setMensagemErro] = useState("");
+  const [modalVerificacao, setModalVerificacao] = useState(false);
 
   const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, senha);
-      console.log("Login realizado com sucesso!");
+      const { user } = await signInWithEmailAndPassword(auth, email.trim(), senha);
+
+      // Conta sem e-mail confirmado: reenvia o link e abre a modal de verificação
+      if (!user.emailVerified) {
+        await sendEmailVerification(user, { url: `${window.location.origin}/login` })
+          .catch((err) => console.error(err));
+        setModalVerificacao(true);
+        return;
+      }
+
       navigate("/menu");
     } catch (error) {
       console.error("Erro ao entrar:", error.code);
@@ -118,7 +129,23 @@ export default function Login() {
       <PopUpGenerico 
         isOpen={modalAberto} 
         onClose={() => setModalAberto(false)} 
-        mensagem={mensagemErro} 
+        mensagem={mensagemErro}
+      />
+
+      <ModalVerificacaoEmail
+        isOpen={modalVerificacao}
+        email={email.trim()}
+        redirectPath="/login"
+        onVerificado={async (user) => {
+          await updateDoc(doc(db, "usuarios", user.uid), { emailVerificado: true })
+            .catch((err) => console.error(err));
+          setModalVerificacao(false);
+          navigate("/menu");
+        }}
+        onFechar={async () => {
+          setModalVerificacao(false);
+          await signOut(auth);
+        }}
       />
     </div>
   );

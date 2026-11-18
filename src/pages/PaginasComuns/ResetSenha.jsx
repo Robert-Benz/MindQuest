@@ -12,7 +12,7 @@ export default function RecuperarSenha() {
   const [loading, setLoading] = useState(false);
 
   const handleRecuperarSenha = async (e) => {
-    e.preventDefault(); // Evita o recarregamento da página[cite: 14]
+    e.preventDefault(); // Evita o recarregamento da página
     setMensagem({ tipo: "", texto: "" });
 
     if (!email) {
@@ -28,7 +28,7 @@ export default function RecuperarSenha() {
         tipo: "sucesso", 
         texto: "Link de recuperação enviado! Verifique sua caixa de entrada (e o spam)." 
       });
-      setEmail(""); // Limpa o campo após o sucesso[cite: 14]
+      setEmail(""); // Limpa o campo após o sucesso
     } catch (error) {
       console.error("Erro ao enviar email de recuperação:", error.code);
       if (error.code === "auth/user-not-found" || error.code === "auth/invalid-email") {
@@ -67,7 +67,7 @@ export default function RecuperarSenha() {
               Esqueceu a senha?
             </h2>
             <p className="text-[#9A6A58] mt-2 text-sm">
-              Digite seu email abaixo e enviaremos um link para você redefinir sua senha.[cite: 14]
+              Digite seu email abaixo e enviaremos um link para você redefinir sua senha.
             </p>
           </div>
 
