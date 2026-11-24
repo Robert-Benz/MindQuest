@@ -367,7 +367,7 @@ export default function historicoPaciente() {
 
               <div className="space-y-2 pt-2 border-t border-slate-100">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-                  Parecer e Insights da Inteligência Artificial
+                  Parecer e Análises da Inteligência Artificial
                 </span>
                 <div className="bg-orange-50/40 border border-orange-100/60 p-4 rounded-2xl">
                   <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-line">
