@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Mail, Lock, User, Sparkles, ChevronRight, CheckSquare, Square, ShieldCheck, Check, Calendar, Users,Eye, EyeOff, X} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "firebase/auth";
+import { doc, setDoc, updateDoc } from "firebase/firestore";
+import ModalVerificacaoEmail from "../../components/ModalVerificacaoEmail";
+import { mapearErroFirebase } from "../../utils/fireBaseErrors";
 import { toast } from "sonner";
 import logoReduzido from "../../assets/LogoPessegoReduzido.png";
 import { textoTermos } from "../../utils/termos";
@@ -121,16 +123,9 @@ export default function Cadastro() {
   const [modalTermosLeitura, setModalTermosLeitura] = useState(false);
   const [termosAceitos, setTermosAceitos] = useState(false);
 
-  // Estados para a Modal de Confirmação de Código
-  const [modalCodigo, setModalCodigo] = useState(false);
-  const [codigo, setCodigo] = useState(["", "", "", "", "", ""]);
-  const [erroCodigo, setErroCodigo] = useState("");
-  const [loadingModal, setLoadingModal] = useState(false);
-
-  const [dadosCadastroPendente, setDadosCadastroPendente] = useState(null);
-
-  const [codigoVerificacao, setcodigoVerificacao] = useState("");
-  const codigoCompleto = codigo.every((digit) => digit !== "");
+  // Estados da verificação de e-mail (Firebase)
+  const [modalVerificacao, setModalVerificacao] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const opcoesGenero = [
     { value: "feminino", label: "Feminino" },
@@ -140,7 +135,7 @@ export default function Cadastro() {
     { value: "prefiro_nao_informar", label: "Prefiro não informar" }
   ];
 
-  const handleCadastro = (e) => {
+  const handleCadastro = async (e) => {
     e.preventDefault();
 
     const emailLimpo = email.trim().toLowerCase();
@@ -182,60 +177,11 @@ export default function Cadastro() {
       return;
     }
 
-    const codigoGerado = Math.floor(100000 + Math.random() * 900000).toString();
-    setcodigoVerificacao(codigoGerado);
-
-    // Armazena dados temporários e abre a modal sem salvar na base de dados
-    setDadosCadastroPendente({
-      nome,
-      email: emailLimpo,
-      senha,
-      dataNascimento,
-      genero
-    });
-
-    setCodigo(["", "", "", "", "", ""]);
-    setErroCodigo("");
-    setModalCodigo(true);
-    toast.info("Código de verificação enviado para seu e-mail!");
-  };
-
-  // Funções de manipulação do Código de Verificação
-  const handleCodigoChange = (value, index) => {
-    if (!/^\d*$/.test(value)) return;
-
-    const novoCodigo = [...codigo];
-    novoCodigo[index] = value;
-    setCodigo(novoCodigo);
-    setErroCodigo("");
-
-    if (value && index < 5) {
-      document.getElementById(`codigo-${index + 1}`)?.focus();
-    }
-  };
-
-  const handleReenviarCodigo = () => {
-    toast.success("Código de verificação reenviado para o seu e-mail!");
-  };
-
-  // CONFIRMAÇÃO DO CÓDIGO E CRIAÇÃO DA CONTA NO FIREBASE
-  const handleConfirmarCodigo = async () => {
-    const codigoDigitado = codigo.join("");
-
-    if (codigoDigitado !== codigoVerificacao) {
-      setErroCodigo("Código inválido. Tente novamente.");
-      return;
-    }
-
-    setErroCodigo("");
-    setLoadingModal(true);
+    setLoading(true);
 
     try {
-      const { nome, email, senha, dataNascimento, genero } = dadosCadastroPendente;
-
       // 1. Cria conta no Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
-      const user = userCredential.user;
+      const { user } = await createUserWithEmailAndPassword(auth, emailLimpo, senha);
 
       await updateProfile(user, { displayName: nome });
 
@@ -249,7 +195,7 @@ export default function Cadastro() {
       // 2. Grava o documento no Firestore
       await setDoc(doc(db, "usuarios", user.uid), {
         nome,
-        email,
+        email: emailLimpo,
         dataNascimento,
         genero,
         xp: 0,
@@ -259,28 +205,36 @@ export default function Cadastro() {
         tipoPerfil: "usuario",
         codigoUnico,
         temaEquipado: "default",
-        emailVerificado: true
+        emailVerificado: false
       });
 
-      toast.success("E-mail verificado e conta criada com sucesso! Bem-vindo ao MindQuest.");
-      setModalCodigo(false);
-      setDadosCadastroPendente(null);
-      navigate("/menu");
+      // 3. Envia o link real de verificação do Firebase
+      await sendEmailVerification(user, { url: `${window.location.origin}/login` });
 
+      toast.info("Enviamos um link de confirmação para o seu e-mail!");
+      setModalVerificacao(true);
     } catch (error) {
       console.error(error);
-      if (error.code === "auth/email-already-in-use") {
-        setErroCodigo("Este e-mail já está em uso por outra conta.");
-      } else if (error.code === "auth/invalid-email") {
-        setErroCodigo("E-mail inválido.");
-      } else if (error.code === "auth/weak-password") {
-        setErroCodigo("A senha deve ter pelo menos 6 caracteres.");
-      } else {
-        setErroCodigo("Erro ao criar conta. Tente novamente.");
-      }
+      toast.error(mapearErroFirebase(error.code));
     } finally {
-      setLoadingModal(false);
+      setLoading(false);
     }
+  };
+
+  // Chamado pela modal quando o Firebase confirma emailVerified
+  const handleVerificado = async (user) => {
+    await updateDoc(doc(db, "usuarios", user.uid), { emailVerificado: true });
+    toast.success("E-mail verificado! Bem-vindo ao MindQuest.");
+    setModalVerificacao(false);
+    navigate("/menu");
+  };
+
+  // Fechar sem confirmar: a conta já existe, então desloga e manda para o login
+  const handleFecharVerificacao = async () => {
+    setModalVerificacao(false);
+    await signOut(auth);
+    toast.info("Conta criada! Confirme o e-mail e faça login para continuar.");
+    navigate("/login");
   };
 
   return (
@@ -481,9 +435,16 @@ export default function Cadastro() {
             {/* Botão de Submissão */}
             <button 
               type="submit"
+              disabled={loading}
               className="w-full py-3 bg-[#E97451] hover:bg-[#C06043] text-white rounded-xl font-bold text-xs shadow-md shadow-orange-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:active:scale-100 cursor-pointer"
             >
-              Verificar E-mail e Prosseguir <ChevronRight size={16} />
+              {loading ? (
+                <Sparkles className="size-4 animate-spin" />
+              ) : (
+                <>
+                  Criar Conta e Verificar E-mail <ChevronRight size={16} />
+                </>
+              )}
             </button>
           </form>
         </motion.div>
@@ -500,89 +461,14 @@ export default function Cadastro() {
 
       </div>
 
-      {/* MODAL DE CONFIRMAÇÃO DE CÓDIGO */}
-      <AnimatePresence>
-        {modalCodigo && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full text-center shadow-2xl border border-orange-100 relative"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setModalCodigo(false);
-                  setDadosCadastroPendente(null);
-                }}
-                className="absolute top-5 left-5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <ArrowLeft size={18} />
-              </button>
-
-              <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center mx-auto mb-4 shadow-sm">
-                <Mail className="text-[#E97451] size-7" />
-              </div>
-
-              <h2 className="text-xl font-black text-slate-900 tracking-tight mb-1">
-                Confirmar E-mail
-              </h2>
-
-              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-                Digite o código de 6 dígitos enviado para <br />
-                <strong className="text-slate-700">{email}</strong>
-              </p>
-
-              {/* Inputs dos 6 Dígitos */}
-              <div className="flex justify-center gap-2 mb-4">
-                {codigo.map((digit, index) => (
-                  <input
-                    key={index}
-                    id={`codigo-${index}`}
-                    type="text"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleCodigoChange(e.target.value, index)}
-                    className="w-10 h-12 text-center text-lg font-bold rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-white text-slate-800 transition-all"
-                  />
-                ))}
-              </div>
-
-              {erroCodigo && (
-                <p className="text-rose-500 text-xs mb-4 font-semibold">
-                  {erroCodigo}
-                </p>
-              )}
-
-              <button
-                type="button"
-                onClick={handleConfirmarCodigo}
-                disabled={!codigoCompleto || loadingModal}
-                className={`w-full py-3 rounded-xl font-bold text-xs text-white transition-all shadow-md flex items-center justify-center gap-2 ${
-                  !codigoCompleto || loadingModal
-                    ? "bg-slate-300 cursor-not-allowed shadow-none"
-                    : "bg-[#E97451] hover:bg-[#C06043] shadow-orange-500/20 active:scale-95 cursor-pointer"
-                }`}
-              >
-                {loadingModal ? (
-                  <Sparkles className="size-4 animate-spin" />
-                ) : (
-                  "Confirmar e Criar Conta"
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleReenviarCodigo}
-                className="mt-4 text-xs font-semibold text-[#E97451] hover:underline block mx-auto cursor-pointer"
-              >
-                Reenviar código
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* MODAL DE VERIFICAÇÃO DE E-MAIL (Firebase) */}
+      <ModalVerificacaoEmail
+        isOpen={modalVerificacao}
+        email={email.trim().toLowerCase()}
+        redirectPath="/login"
+        onVerificado={handleVerificado}
+        onFechar={handleFecharVerificacao}
+      />
 
       {/* MODAL DE LEITURA DOS TERMOS SEPARADOS */}
       <AnimatePresence>

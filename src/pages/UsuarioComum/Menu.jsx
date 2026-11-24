@@ -8,7 +8,7 @@ import BottomNav from "../../components/BottomNav";
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, collection, query, orderBy, onSnapshot, getDocs, getDoc, where } from "firebase/firestore";
-import { geraInsightDiario } from "../../services/aiService";
+import { geraAnaliseDiario } from "../../services/aiService";
 import { analiseSemanal } from "../../services/analiseHumorService";
 
 const getThemeColor = (varName, fallbackHex) => `var(${varName}, ${fallbackHex})`;
@@ -53,8 +53,8 @@ export default function Menu() {
   const [registrouHoje, setRegistrouHoje] = useState(false);
   const [userXP, setUserXP] = useState(0);
 
-  const [insightIA, setInsightIA] = useState("");
-  const [carregaInsight, setcarregaInsight] = useState(false);
+  const [analiseIA, setanaliseIA] = useState("");
+  const [carregaAnalise, setcarregaAnalise] = useState(false);
 
   const [humorSemanal, setHumorSemanal] = useState([
     { dia: "Seg", nivel: 0, cor: "bg-slate-200" },
@@ -222,29 +222,29 @@ export default function Menu() {
                    dataAtiv.getFullYear() === anoHoje;
           }).length;
 
-          setcarregaInsight(true);
+          setcarregaAnalise(true);
 
           let ignorar = false;
 
-          geraInsightDiario(respostas, humorDeHoje, totalAtivHoje)
+          geraAnaliseDiario(respostas, humorDeHoje, totalAtivHoje)
             .then((res) => {
-              if (!ignorar) setInsightIA(res);
+              if (!ignorar) setanaliseIA(res);
             })
             .catch((erroIA) => {
               if (!ignorar) {
                 console.error("Erro na API da IA:", erroIA);
-                setInsightIA("Que o seu dia encontre momentos de calma e clareza. Siga em frente no seu próprio ritmo! ✨");
+                setanaliseIA("Que o seu dia encontre momentos de calma e clareza. Siga em frente no seu próprio ritmo! ✨");
               }
             })
             .finally(() => {
-              if (!ignorar) setcarregaInsight(false);
+              if (!ignorar) setcarregaAnalise(false);
             });
 
           return () => {
             ignorar = true;
           };
         } else {
-          setInsightIA("");
+          setanaliseIA("");
         }
 
       } catch (error) {
@@ -274,7 +274,7 @@ export default function Menu() {
 
   return (
     <div className="min-h-screen bg-[#FFFBF9] flex flex-col antialiased text-slate-700 pb-28">
-      
+
       {/* HEADER */}
       <header 
         style={{ borderColor: getThemeColor('--primary-light', 'rgba(233, 116, 81, 0.15)') }}
@@ -353,7 +353,7 @@ export default function Menu() {
           </button>
         </div>
 
-        {/* CARD INSIGHT DIÁRIO */}
+        {/* CARD ANÁLISE DIÁRIA */}
         {registrouHoje && ultimoHumor && !isAnyModalOpen && (
           <motion.div 
             initial={{ opacity: 0, y: 15 }}
@@ -372,14 +372,14 @@ export default function Menu() {
               <span style={{ color: getThemeColor('--primary', '#E97451') }} className="text-[10px] font-bold uppercase tracking-widest">MindQuest IA</span>
             </div>
 
-            {carregaInsight ? (
+            {carregaAnalise ? (
               <div className="space-y-2 animate-pulse">
                 <div className="h-3 bg-slate-200 rounded-full w-full"></div>
                 <div className="h-3 bg-slate-200 rounded-full w-5/6"></div>
               </div>
             ) : (
               <p className="text-sm leading-relaxed font-semibold text-slate-700 relative z-10">
-                {insightIA || "Que seu dia seja repleto de tranquilidade e foco em suas conquistas! ✨"}
+                {analiseIA || "Que seu dia seja repleto de tranquilidade e foco em suas conquistas! ✨"}
               </p>
             )}
           </motion.div>

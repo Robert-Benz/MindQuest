@@ -63,7 +63,7 @@ export default function analiseHumor() {
           </button>
           <div className="flex items-center gap-1.5 bg-app-card border border-app-border px-3 py-1.5 rounded-full shadow-sm backdrop-blur">
             <BrainCircuit size={14} className="text-app-primary" />
-            <span className="text-[10px] font-black text-app-muted uppercase tracking-widest">Insights</span>
+            <span className="text-[10px] font-black text-app-muted uppercase tracking-widest">Análises</span>
           </div>
         </div>
 
@@ -214,7 +214,7 @@ export default function analiseHumor() {
                     <Brain className="size-4 text-app-primary" />
                   </div>
                   <span className="text-[10px] font-bold text-app-primary uppercase tracking-wider">
-                    Insight da MindQuest IA
+                    Análise da MindQuest IA
                   </span>
                 </div>
 

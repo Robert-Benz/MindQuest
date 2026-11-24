@@ -14,7 +14,7 @@ const formatarResposta = (resposta, fallback = "Geral") => {
 // =========================================================================
 // 1. INSIGHT DIÁRIO
 // =========================================================================
-export const geraInsightDiario = async (respostasPerfil, humorHoje, totalAtividades = 0) => {
+export const geraAnaliseDiario = async (respostasPerfil, humorHoje, totalAtividades = 0) => {
   const humor = humorHoje?.humor || "Bem";
   const nota = humorHoje?.nota || "";
   const fatores = formatarResposta(humorHoje?.fatores, "Geral");
@@ -70,7 +70,7 @@ export const geraInsightDiario = async (respostasPerfil, humorHoje, totalAtivida
 
     return textoGerado;
   } catch (error) {
-    console.error("Erro detalhado no Insight:", error);
+    console.error("Erro detalhado na Análise:", error);
     if (humor.toLowerCase().includes("ansioso") || humor.toLowerCase().includes("raiva") || humor.toLowerCase().includes("triste")) {
       return "Respire fundo e dê um passo de cada vez. Respeitar o seu próprio ritmo hoje já é uma vitória valiosa.";
     }

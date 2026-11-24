@@ -21,7 +21,7 @@ export const textoTermos = (
 
     <section>
       <h2 className="text-sm font-bold text-slate-800 mb-2">2. Processamento por Inteligência Artificial (IA)</h2>
-      <p className="mb-2 leading-relaxed">Para fornecer insights diários, resumos semanais e gerar missões personalizadas, o MindQuest integra a tecnologia de Inteligência Artificial do Google (Gemini API).</p>
+      <p className="mb-2 leading-relaxed">Para fornecer análises diárias, resumos semanais e gerar missões personalizadas, o MindQuest integra a tecnologia de Inteligência Artificial do Google (Gemini API).</p>
       <ul className="list-disc pl-5 space-y-1.5 marker:text-[#E97451]">
         <li><strong className="text-slate-700">Como funciona:</strong> Seus dados de humor, anotações diárias e preferências são enviados de forma segura para a IA elaborar as recomendações.</li>
         <li><strong className="text-slate-700">Proteção e Privacidade:</strong> Seus dados não são utilizados para treinar modelos públicos de Inteligência Artificial. O processamento ocorre exclusivamente no momento da sua requisição para gerar a resposta que você visualiza no aplicativo.</li>
