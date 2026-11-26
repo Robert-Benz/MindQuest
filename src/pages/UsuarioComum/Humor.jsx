@@ -1,22 +1,38 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud, CloudSun } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageCircle, Tag, CloudRain, Sun, Cloud, CloudSun, MapPin, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "../../firebaseConfig";
-import { collection, doc, setDoc, updateDoc, increment } from "firebase/firestore";
+import { collection, doc, setDoc, updateDoc, increment, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { toast } from "sonner";
+import useLocalizacaoClima from "../../hooks/useLocalizacaoClima";
+import { climaParaCategoria } from "../../services/climaService";
+
+// Se o OpenWeather não responder neste tempo, libera a seleção manual do clima
+const TEMPO_ESPERA_CLIMA_MS = 6000;
 
 export default function Humor() {
   const navigate = useNavigate();
   const location = useLocation();
 
   // Dados recebidos do Calendário em caso de edição
-  const edicaoRegistro = location.state?.edicaoRegistro || null;
+  // (Calendário e Menu enviam como "registroParaEditar")
+  const edicaoRegistro = location.state?.registroParaEditar || location.state?.edicaoRegistro || null;
 
   const [selectedMood, setSelectedMood] = useState(null);
-  const [selectedClima, setSelectedClima] = useState(null); 
+  const [selectedClima, setSelectedClima] = useState(null); // só usado na seleção manual (reserva)
   const [note, setNote] = useState("");
   const [selectedFactors, setSelectedFactors] = useState([]);
+
+  // Clima automático (OpenWeather). Ao editar um registro antigo, mantém o clima daquele dia.
+  const { status: statusClima, clima: climaApi, localizacao } = useLocalizacaoClima({ ativo: !edicaoRegistro });
+  const [tempoEsgotado, setTempoEsgotado] = useState(false);
+
+  useEffect(() => {
+    if (edicaoRegistro || statusClima !== "carregando") return;
+    const timer = setTimeout(() => setTempoEsgotado(true), TEMPO_ESPERA_CLIMA_MS);
+    return () => clearTimeout(timer);
+  }, [edicaoRegistro, statusClima]);
 
   const moods = [
     { emoji: "😡", label: "Raiva", color: "text-rose-500", question: "O que te tirou do sério hoje?", nivel: 10 },
@@ -56,15 +72,6 @@ export default function Humor() {
         setSelectedMood(moodIndex);
       }
 
-      if (edicaoRegistro.clima?.condicao) {
-        const climaIndex = climas.findIndex(
-          (c) => c.label.toLowerCase() === edicaoRegistro.clima.condicao.toLowerCase()
-        );
-        if (climaIndex !== -1) {
-          setSelectedClima(climaIndex);
-        }
-      }
-
       if (edicaoRegistro.nota) {
         setNote(edicaoRegistro.nota);
       }
@@ -81,9 +88,47 @@ export default function Humor() {
     );
   };
 
+  // =========================================================================
+  // DEFINIÇÃO DO CLIMA A SALVAR (automático, do registro editado ou manual)
+  // =========================================================================
+  const climaSalvoEdicao = edicaoRegistro?.clima?.condicao ? edicaoRegistro.clima : null;
+
+  const climaDetectado = !edicaoRegistro && climaApi
+    ? {
+        condicao: climaParaCategoria(climaApi), // "Ensolarado" | "Nublado" | "Chuvoso"
+        descricao: climaApi.descricao || null,  // ex.: "Céu limpo"
+        temperatura: Number.isFinite(climaApi.temperatura) ? climaApi.temperatura : null,
+        icone: climaApi.icone || null,
+        cidade: localizacao?.cidade || climaApi.cidade || null,
+        fonte: "openweather",
+      }
+    : null;
+
+  const escolhaManual = selectedClima !== null
+    ? { condicao: climas[selectedClima].label, fonte: "manual" }
+    : null;
+
+  // A seleção manual só aparece se a API falhou, não trouxe clima ou demorou demais
+  const modoManual = edicaoRegistro
+    ? !climaSalvoEdicao
+    : escolhaManual !== null ||
+      statusClima === "erro" ||
+      (statusClima === "pronto" && !climaApi) ||
+      (statusClima === "carregando" && tempoEsgotado);
+
+  const climaParaSalvar = edicaoRegistro
+    ? climaSalvoEdicao || escolhaManual
+    : escolhaManual || climaDetectado;
+
+  const climaExibido = climaSalvoEdicao || climaDetectado;
+
   const handleSave = async () => {
-    if (selectedMood === null || selectedClima === null) {
-      toast.error("Por favor, selecione o seu humor e o clima lá fora!");
+    if (selectedMood === null) {
+      toast.error("Por favor, selecione o seu humor!");
+      return;
+    }
+    if (!climaParaSalvar) {
+      toast.error("Aguarde o clima carregar ou selecione-o manualmente.");
       return;
     }
 
@@ -99,9 +144,7 @@ export default function Humor() {
       const fimDeSemana = numeroDia === 0 || numeroDia === 6;
       const tipoDeDia = fimDeSemana ? "Fim de Semana" : "Dia de Semana";
 
-      const climaMap = {
-        condicao: climas[selectedClima].label 
-      };
+      const climaMap = climaParaSalvar;
 
       const dadosDoHumor = {
         humor: moods[selectedMood].label,
@@ -113,10 +156,33 @@ export default function Humor() {
         tipoDia: tipoDeDia,
       };
 
-      if (edicaoRegistro?.docId) {
-        const docRef = doc(db, "usuarios", user.uid, "registrosHumor", edicaoRegistro.docId);
+      // Só pode haver UM registro por dia: se não veio do botão "Editar",
+      // procura o registro de hoje e atualiza ele em vez de criar outro.
+      let docIdExistente = edicaoRegistro?.docId || null;
+
+      if (!docIdExistente) {
+        const inicioDoDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+        const fimDoDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1);
+        const registroDeHoje = await getDocs(
+          query(
+            collection(db, "usuarios", user.uid, "registrosHumor"),
+            where("data", ">=", inicioDoDia),
+            where("data", "<", fimDoDia),
+            orderBy("data", "desc"),
+            limit(1)
+          )
+        );
+        if (!registroDeHoje.empty) docIdExistente = registroDeHoje.docs[0].id;
+      }
+
+      if (docIdExistente) {
+        const docRef = doc(db, "usuarios", user.uid, "registrosHumor", docIdExistente);
         await updateDoc(docRef, dadosDoHumor);
-        toast.success("Registro atualizado com sucesso! ✨");
+        toast.success(
+          edicaoRegistro
+            ? "Registro atualizado com sucesso! ✨"
+            : "Você já tinha feito o check-in hoje — ele foi atualizado! ✨"
+        );
       } else {
         const humorRef = doc(collection(db, "usuarios", user.uid, "registrosHumor"));
         await setDoc(humorRef, {
@@ -215,8 +281,59 @@ export default function Humor() {
                {/* Pergunta do Clima */}
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-xs font-bold uppercase ml-2 tracking-widest text-app-primary">
-                  <CloudSun className="size-3" /> Como foi o clima lá fora?
+                  <CloudSun className="size-3" /> Clima lá fora
                 </label>
+
+                {/* Clima detectado pela API (ou o salvo no registro que está sendo editado) */}
+                {!modoManual && climaExibido && (() => {
+                  const IconeCategoria = (climas.find((c) => c.label === climaExibido.condicao) || climas[1]).icon;
+                  return (
+                    <div className="flex items-center gap-3 p-3 sm:p-4 rounded-2xl bg-app-bg border border-app-border">
+                      {climaExibido.icone ? (
+                        <img src={climaExibido.icone} alt={climaExibido.descricao || climaExibido.condicao} className="size-12 shrink-0" />
+                      ) : (
+                        <IconeCategoria className="size-8 shrink-0 text-app-primary" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-app-text">
+                          {climaExibido.descricao || climaExibido.condicao}
+                          {climaExibido.temperatura !== null && climaExibido.temperatura !== undefined && (
+                            <span className="ml-1.5 text-app-primary">{climaExibido.temperatura}°C</span>
+                          )}
+                        </p>
+                        {climaExibido.cidade && (
+                          <p className="text-[11px] text-app-muted flex items-center gap-1 truncate">
+                            <MapPin className="size-3 shrink-0" /> {climaExibido.cidade}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-app-muted/80 mt-0.5">
+                          {edicaoRegistro ? "Clima registrado no check-in" : "Detectado automaticamente"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Buscando o clima */}
+                {!modoManual && !climaExibido && (
+                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-app-bg border border-app-border text-app-muted">
+                    <RefreshCw className="size-5 animate-spin text-app-primary shrink-0" />
+                    <span className="text-xs sm:text-sm">Buscando o clima da sua região...</span>
+                  </div>
+                )}
+
+                {/* Reserva: seleção manual quando a API falha ou demora */}
+                {modoManual && escolhaManual === null && (
+                  <p className="text-[11px] text-app-muted ml-2">
+                    {edicaoRegistro
+                      ? "Este registro não tem clima salvo. Selecione abaixo:"
+                      : statusClima === "carregando"
+                        ? "O clima está demorando para carregar. Selecione manualmente:"
+                        : "Não foi possível obter o clima automaticamente. Selecione manualmente:"}
+                  </p>
+                )}
+
+                {modoManual && (
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {climas.map((clima, index) => {
                     const Icone = clima.icon;
@@ -238,6 +355,7 @@ export default function Humor() {
                     )
                   })}
                 </div>
+                )}
               </div>
 
               {/* Fatores Categorizados */}
@@ -272,7 +390,7 @@ export default function Humor() {
 
         <button
           type="button"
-          disabled={selectedMood === null || selectedClima === null}
+          disabled={selectedMood === null || !climaParaSalvar}
           onClick={handleSave}
           className="w-full mt-8 text-white font-bold py-3.5 sm:py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale active:scale-95 cursor-pointer hover:opacity-90 bg-app-primary shadow-app-primary/40 text-sm sm:text-base"
         >

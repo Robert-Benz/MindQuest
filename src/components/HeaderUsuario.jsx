@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, Settings } from "lucide-react";
+import { Sparkles, Settings, Coins } from "lucide-react";
 import { motion } from "framer-motion";
 import logoReduzido from "../assets/LogoPessegoReduzido.png";
 import { auth, db } from "../firebaseConfig";
@@ -10,6 +10,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 export default function HeaderUsuario() {
   const navigate = useNavigate();
   const [userXP, setUserXP] = useState(0);
+  const [userMoedas, setUserMoedas] = useState(0);
 
   useEffect(() => {
     let unsubUser = () => {};
@@ -22,6 +23,7 @@ export default function HeaderUsuario() {
         unsubUser = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             setUserXP(docSnap.data().xp || 0);
+            setUserMoedas(docSnap.data().moedas || 0);
           }
         }, (err) => {
           console.warn("Erro ao ouvir XP no header:", err);
@@ -62,8 +64,18 @@ export default function HeaderUsuario() {
           </div>
         </div>
 
-        {/* Lado Direito: Nível, Barra de XP e Perfil */}
-        <div className="flex items-center gap-4">
+        {/* Lado Direito: Moedas, Nível, Barra de XP e Perfil */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={() => navigate("/loja")}
+            className="flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200 shadow-xs cursor-pointer hover:bg-amber-100 transition-colors self-start"
+            title="Suas moedas — abrir a loja"
+          >
+            <Coins className="size-3.5 text-amber-500" />
+            <span className="text-xs font-black text-amber-600 tabular-nums">{userMoedas}</span>
+          </button>
+
           <div 
             onClick={() => navigate("/perfil")}
             className="flex flex-col items-end cursor-pointer"
