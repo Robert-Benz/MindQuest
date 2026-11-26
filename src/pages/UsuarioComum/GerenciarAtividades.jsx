@@ -1,16 +1,32 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ListTodo, Sparkles, Trash2, CheckCircle2, Circle, CalendarHeart, RefreshCw, Clock, Zap, Coins, Check } from "lucide-react";
+import { ListTodo, Sparkles, Trash2, CheckCircle2, Circle, CalendarHeart, RefreshCw, Clock, Zap, Coins, Check, MapPin, Sun } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { auth, db } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, addDoc, getDocs, updateDoc, deleteDoc,doc, query, limit, getDoc, increment, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, limit, getDoc, increment, where, writeBatch } from "firebase/firestore";
 
 import { toast } from "sonner";
 import BottomNav from "../../components/BottomNav";
 import HeaderUsuario from "../../components/HeaderUsuario";
 import { geraAtividades } from "../../services/aiService";
+import { estaChovendo } from "../../services/climaService";
+import useLocalizacaoClima from "../../hooks/useLocalizacaoClima";
+import {
+  obterContextoExterno,
+  geraMissoesDeLugares,
+  ajustarMissoesAoHorarioEClima,
+  ehAtividadeExterna,
+  dentroDoHorarioExterno,
+  TEXTO_HORARIO_EXTERNO,
+} from "../../services/missoesLugaresService";
+
+// Quantas missões de passeio entram em cada geração (quando o clima e o horário permitem)
+const MISSOES_PASSEIO_POR_GERACAO = 1;
+
+// Moedas ganhas por missão (entram junto com o XP ao limpar a missão concluída)
+const VALOR_MOEDAS_MISSAO = 10;
 
 // Obtém a data local de hoje no formato YYYY-MM-DD
 const getDataFormatada = () => {
@@ -21,12 +37,17 @@ const getDataFormatada = () => {
   return `${ano}-${mes}-${dia}`;
 };
 
-export default function gerenciarAtividades() {
+export default function GerenciarAtividades() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [gerandoIA, setGerandoIA] = useState(false);
   const [atividades, setAtividades] = useState([]);
   const [userUid, setUserUid] = useState(null);
+  const processando = useRef(new Set()); // missões sendo limpas agora
+
+  // Clima atual da região do usuário (mesmo cache do check-in de humor)
+  const { status: statusClima, clima, localizacao } = useLocalizacaoClima();
+  const climaImpedeExternas = estaChovendo(clima);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -40,7 +61,7 @@ export default function gerenciarAtividades() {
     return () => unsubscribe();
   }, [navigate]);
 
-  const executaIA = async (uid, titulosExistentes = [], quantidadeVagas = 3) => {
+  const executaIA = async (uid, titulosExistentes = [], quantidadeVagas = 3, lugaresUsados = []) => {
     if (gerandoIA || quantidadeVagas <= 0) return;
     setGerandoIA(true);
 
@@ -53,15 +74,27 @@ export default function gerenciarAtividades() {
       );
       const ultimoHumor = humorSnap.empty ? { humor: "Equilibrado", emoji: "🙂" } : humorSnap.docs[0].data();
 
-      const sugestoes = await geraAtividades(
-        dadosUsuario, 
-        ultimoHumor, 
-        titulosExistentes,
-        quantidadeVagas
-      );
+      // IA (Gemini) e localização + clima (OpenWeather) rodam em paralelo.
+      // Pede 2 sugestões extras à IA para repor as de fora de casa que forem descartadas.
+      const [sugestoes, contexto] = await Promise.all([
+        geraAtividades(dadosUsuario, ultimoHumor, titulosExistentes, quantidadeVagas + 2),
+        obterContextoExterno(),
+      ]);
+
+      // Lugares próximos (Geoapify): só sem chuva e entre 06h e 20h
+      const missoesPasseio = await geraMissoesDeLugares(contexto, {
+        quantidade: Math.min(MISSOES_PASSEIO_POR_GERACAO, quantidadeVagas),
+        lugaresUsados,
+      });
 
       const hojeStr = getDataFormatada();
-      const lote = (sugestoes || []).slice(0, quantidadeVagas);
+      // Com chuva ou fora da janela 06h–20h, atividades fora de casa viram atividades em casa
+      const lote = ajustarMissoesAoHorarioEClima(
+        [...missoesPasseio, ...(sugestoes || [])],
+        quantidadeVagas,
+        titulosExistentes,
+        contexto?.clima
+      );
       const novasSalvas = [];
 
       for (const item of lote) {
@@ -69,12 +102,15 @@ export default function gerenciarAtividades() {
           titulo: item.titulo,
           descricao: item.descricao,
           categoria: item.categoria || "Bem-Estar",
-          tempoEstimado: item.tempoEstimado || "10 min",
+          tempoEstimado: item.tempoEstimado || item.tempoAtividade || "10 min",
           xp: Number(item.xp) || 10,
           concluida: false,
           oculta: false,
           dataReferencia: hojeStr,
-          criadoEm: new Date().toISOString()
+          criadoEm: new Date().toISOString(),
+          aoArLivre: Boolean(item.aoArLivre),
+          // O Firestore não aceita campos "undefined", então só inclui quando existe
+          ...(item.lugar ? { lugar: item.lugar } : {}),
         };
         const refDoc = await addDoc(collection(db, "usuarios", uid, "atividades"), novaMissao);
         novasSalvas.push({ id: refDoc.id, ...novaMissao });
@@ -82,6 +118,9 @@ export default function gerenciarAtividades() {
 
       setAtividades(prev => [...prev, ...novasSalvas]);
       toast.success(quantidadeVagas === 1 ? "Nova missão preparada! 🎯" : "Missões do dia preparadas! 🎯");
+      if (estaChovendo(contexto?.clima) && dentroDoHorarioExterno()) {
+        toast.info("Está chovendo aí — hoje as missões são para fazer em casa. ☔");
+      }
     } catch (error) {
       console.error("Erro ao gerar missões:", error);
       toast.error("Não foi possível gerar novas missões.");
@@ -122,29 +161,35 @@ export default function gerenciarAtividades() {
     if (!uid) return;
 
     const novoStatus = !atividade.concluida;
-    const valorMoedas = 10;
-    const valorXP = Number(atividade.xp) || 10;
 
-    setAtividades(prev => prev.map(a => 
-      a.id === atividade.id ? { ...a, concluida: novoStatus } : a
+    // Atividades fora de casa só podem ser concluídas entre 06h e 20h
+    if (novoStatus && ehAtividadeExterna(atividade) && !dentroDoHorarioExterno()) {
+      toast.info(`Atividades fora de casa só podem ser concluídas entre ${TEXTO_HORARIO_EXTERNO}. 🌙`);
+      return;
+    }
+    // Marcar como feita NÃO dá recompensa: XP, moedas e progresso só contam
+    // quando a missão é limpa (botão "Limpar missão concluída").
+    // Missões marcadas antes desta regra já receberam a recompensa (sem "recompensaPendente").
+    const recompensaJaRecebida = atividade.concluida && !atividade.recompensaPendente;
+
+    const alteracoes = {
+      concluida: novoStatus,
+      concluidaEm: novoStatus ? new Date().toISOString() : null,
+      recompensaPendente: novoStatus,
+    };
+
+    setAtividades(prev => prev.map(a =>
+      a.id === atividade.id ? { ...a, ...alteracoes } : a
     ));
 
     try {
-      await updateDoc(doc(db, "usuarios", uid, "atividades", atividade.id), {
-        concluida: novoStatus,
-        concluidaEm: novoStatus ? new Date().toISOString() : null
-      });
+      await updateDoc(doc(db, "usuarios", uid, "atividades", atividade.id), alteracoes);
 
-      if (novoStatus) {
+      // Desmarcar uma missão antiga que já tinha pago a recompensa: devolve o valor
+      if (!novoStatus && recompensaJaRecebida) {
         await updateDoc(doc(db, "usuarios", uid), {
-          xp: increment(valorXP),
-          moedas: increment(valorMoedas)
-        });
-        toast.success(`Concluído! +${valorXP} XP e +${valorMoedas} Moedas 🪙`);
-      } else {
-        await updateDoc(doc(db, "usuarios", uid), {
-          xp: increment(-valorXP),
-          moedas: increment(-valorMoedas)
+          xp: increment(-(Number(atividade.xp) || 10)),
+          moedas: increment(-VALOR_MOEDAS_MISSAO)
         });
       }
     } catch (error) {
@@ -158,18 +203,47 @@ export default function gerenciarAtividades() {
     const uid = userUid || auth.currentUser?.uid;
     if (!uid) return;
 
+    // Evita receber a recompensa duas vezes com cliques repetidos
+    if (processando.current.has(atividade.id)) return;
+    processando.current.add(atividade.id);
+
     try {
       if (atividade.concluida) {
-        await updateDoc(doc(db, "usuarios", uid, "atividades", atividade.id), { oculta: true });
-        setAtividades(prev => prev.map(a => a.id === atividade.id ? { ...a, oculta: true } : a));
-        toast.success("Atividade limpa da tela.");
+        // Limpar missão concluída: é AQUI que entram XP, moedas e o progresso do dia.
+        // As duas gravações vão juntas (batch): ou salvam as duas, ou nenhuma.
+        const valorXP = Number(atividade.xp) || 10;
+        const lote = writeBatch(db);
+        lote.update(doc(db, "usuarios", uid, "atividades", atividade.id), {
+          oculta: true,
+          recompensaPendente: false,
+        });
+        if (atividade.recompensaPendente) {
+          lote.update(doc(db, "usuarios", uid), {
+            xp: increment(valorXP),
+            moedas: increment(VALOR_MOEDAS_MISSAO)
+          });
+        }
+        await lote.commit();
+
+        if (atividade.recompensaPendente) {
+          toast.success(`Missão concluída! +${valorXP} XP e +${VALOR_MOEDAS_MISSAO} Moedas 🪙`);
+        } else {
+          toast.success("Atividade limpa da tela.");
+        }
+
+        setAtividades(prev => prev.map(a =>
+          a.id === atividade.id ? { ...a, oculta: true, recompensaPendente: false } : a
+        ));
       } else {
         await deleteDoc(doc(db, "usuarios", uid, "atividades", atividade.id));
         setAtividades(prev => prev.filter(a => a.id !== atividade.id));
         toast.success("Atividade excluída.");
       }
     } catch (error) {
+      console.error(error);
       toast.error("Erro ao remover atividade.");
+    } finally {
+      processando.current.delete(atividade.id);
     }
   };
 
@@ -179,7 +253,8 @@ export default function gerenciarAtividades() {
   const atividadesVisiveis = atividades.filter(a => !a.oculta);
   const vagasParaGerar = Math.max(0, 3 - atividadesVisiveis.length);
   
-  const concluidasHoje = atividades.filter(a => a.concluida).length;
+  // Só conta no progresso depois de limpar a missão concluída
+  const concluidasHoje = atividades.filter(a => a.concluida && a.oculta).length;
   const totalObjetivo = 3;
   const progresso = Math.min(100, Math.round((concluidasHoje / totalObjetivo) * 100));
   const atingiuMeta = concluidasHoje >= totalObjetivo;
@@ -246,11 +321,59 @@ export default function gerenciarAtividades() {
           </div>
         </motion.div>
 
+        {/* CLIMA ATUAL DA REGIÃO */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-2"
+        >
+          <div className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 shadow-sm shadow-slate-900/5 p-4">
+            {clima ? (
+              <>
+                {clima.icone ? (
+                  <img src={clima.icone} alt={clima.descricao} className="size-12 shrink-0 -my-1" />
+                ) : (
+                  <Sun className="size-8 shrink-0 text-[var(--primary)]" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Clima agora</span>
+                  <p className="text-sm font-bold text-slate-800 truncate">{clima.descricao}</p>
+                  {(localizacao?.cidade || clima.cidade) && (
+                    <p className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
+                      <MapPin size={11} className="shrink-0" /> {localizacao?.cidade || clima.cidade}
+                    </p>
+                  )}
+                </div>
+                {Number.isFinite(clima.temperatura) && (
+                  <span className="text-2xl font-black text-[var(--primary)] shrink-0">{clima.temperatura}°C</span>
+                )}
+              </>
+            ) : statusClima === "carregando" ? (
+              <>
+                <RefreshCw className="size-5 animate-spin text-[var(--primary)] shrink-0" />
+                <span className="text-xs text-slate-500">Buscando o clima da sua região...</span>
+              </>
+            ) : (
+              <>
+                <Sun className="size-5 text-slate-300 shrink-0" />
+                <span className="text-xs text-slate-500">Não foi possível obter o clima agora.</span>
+              </>
+            )}
+          </div>
+
+          {climaImpedeExternas && (
+            <p className="text-[11px] font-semibold text-sky-700 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2 text-center">
+              ☔ Missões externas não serão geradas neste clima
+            </p>
+          )}
+        </motion.div>
+
         <button
           type="button"
           onClick={() => {
             const titulos = atividades.map(a => a.titulo || a.texto).filter(Boolean);
-            executaIA(userUid, titulos, vagasParaGerar);
+            const lugaresUsados = atividades.map(a => a.lugar?.id).filter(Boolean);
+            executaIA(userUid, titulos, vagasParaGerar, lugaresUsados);
           }}
           disabled={gerandoIA || vagasParaGerar === 0}
           style={{ 
@@ -337,6 +460,18 @@ export default function gerenciarAtividades() {
                           <span className="text-[10px] text-[var(--primary)] bg-[var(--primary-light)] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-bold">
                             <Coins size={10} className="fill-[var(--primary)] text-[var(--primary)]" /> +10 Moedas
                           </span>
+                          {ehAtividadeExterna(ativ) && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-bold ${
+                                dentroDoHorarioExterno() || ativ.concluida
+                                  ? "text-emerald-700 bg-emerald-50"
+                                  : "text-slate-500 bg-slate-100"
+                              }`}
+                              title={`Pode ser concluída entre ${TEXTO_HORARIO_EXTERNO}`}
+                            >
+                              <Sun size={10} /> Ao ar livre · {TEXTO_HORARIO_EXTERNO}
+                            </span>
+                          )}
                         </div>
 
                         <h3 className={`text-sm font-bold leading-tight ${
@@ -351,6 +486,20 @@ export default function gerenciarAtividades() {
                           }`}>
                             {ativ.descricao}
                           </p>
+                        )}
+
+                        {/* Missão de passeio: link para abrir o lugar no app de mapas */}
+                        {ativ.lugar?.linkMapa && (
+                          <a
+                            href={ativ.lugar.linkMapa}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold text-[var(--primary)] hover:underline"
+                            title={ativ.lugar.endereco || ativ.lugar.nome}
+                          >
+                            <MapPin size={12} /> Ver no mapa · {ativ.lugar.distanciaTexto}
+                          </a>
                         )}
                       </div>
                     </div>

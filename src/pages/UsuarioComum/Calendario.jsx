@@ -76,7 +76,14 @@ export default function Calendario() {
 
   const espacosVazios = Array.from({ length: primeiroDiaDoMes }, (_, i) => i);
   const diasArray = Array.from({ length: diasNoMes }, (_, i) => i + 1);
-  const diasFelizes = registros.filter(r => r.nivel >= 80).length;
+
+  // Um registro por dia: se houver mais de um (registros antigos duplicados),
+  // vale o mais recente — "registros" vem em ordem crescente de data, então o último sobrescreve
+  const registroPorDia = new Map();
+  registros.forEach((r) => registroPorDia.set(r.dataRegistro.getDate(), r));
+
+  // Conta DIAS felizes, não registros
+  const diasFelizes = [...registroPorDia.values()].filter(r => r.nivel >= 80).length;
 
   const verificarSeEhHoje = (dataRegistro) => {
     const hoje = new Date();
@@ -149,7 +156,8 @@ export default function Calendario() {
                 ))}
 
                 {diasArray.map((dia) => {
-                  const registroDoDia = registros.find(r => r.dataRegistro.getDate() === dia);
+                  // Se houver mais de um registro no dia, usa o mais recente (igual ao Menu)
+                  const registroDoDia = registroPorDia.get(dia);
                   const hoje = new Date();
                   const ehHoje = 
                     dia === hoje.getDate() && 
